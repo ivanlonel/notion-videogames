@@ -1,0 +1,24 @@
+{
+  "editor.rulers": [
+    {
+      "column": 90,
+      "color": "#303030"
+    },
+    99 // Use default color
+  ],
+  "flake8.importStrategy": "fromEnvironment",
+  "mypy-type-checker.importStrategy": "fromEnvironment",
+  "pylint.importStrategy": "fromEnvironment",
+  "black-formatter.importStrategy": "fromEnvironment",
+  "isort.importStrategy": "fromEnvironment",
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "terminal.integrated.env.windows": {
+    "PYTHONPATH": "${env:PYTHONPATH};${workspaceFolder}",
+  },
+}

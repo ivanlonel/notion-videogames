@@ -1,0 +1,137 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+  "setuptools>=65.5.1",
+]
+
+[project]
+name = "notion-videogames"
+version = "0.1"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Ivan Donisete Lonel", email = "ivanlonel91@gmail.com" },
+]
+requires-python = ">=3.12"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+  "betterproto~=2.0.0b7",
+  "howlongtobeatpy~=1.0.8",
+  "igdb-api-v4~=0.3.3",
+  "notion-client>=2.2.1",
+  "notional~=0.8.2",
+  "pydantic>=1.10.18",
+  "python-dotenv~=1.0.1",
+  "requests~=2.32.3",
+  "tenacity~=9.0.0",
+]
+optional-dependencies.dev = [
+  "bandit[toml]~=1.7.9",
+  "black~=24.8.0",
+  "flake8~=7.1.1",
+  "flake8-2020~=1.8",
+  "flake8-boolean-trap~=1.0",
+  "flake8-bugbear~=24.8.19",
+  "flake8-builtins~=2.5",
+  "flake8-comprehensions~=3.15",
+  "flake8-datetimez~=20.10",
+  "flake8-docstrings~=1.7",
+  "flake8-encodings~=0.5",
+  "flake8-implicit-str-concat~=0.4",
+  "flake8-logging~=1.6",
+  "flake8-no-pep420~=2.7",
+  "flake8-noqa~=1.4",
+  "flake8-print~=5.0",
+  "flake8-pytest-style~=2.0",
+  "flake8-raise~=0.0.5",
+  "flake8-return~=1.2",
+  "flake8-simplify~=0.21",
+  "flake8-tidy-imports~=4.10",
+  "flake8-type-checking~=2.9",
+  "flake8-use-fstring~=1.4",
+  "flake8-useless-assert~=0.4",
+  "isort~=5.13.2",
+  "mypy~=1.11.2",
+  "pep8-naming~=0.14",
+  "pre-commit~=3.8",
+  "pylint~=3.3.0",
+  "tryceratops~=2.4",
+  "types-requests~=2.31",
+]
+urls.Repository = "https://github.com/ivanlonel/notion-videogames"
+
+[tool.setuptools.packages.find]
+include = [
+  "notion_videogames*",
+]
+
+[tool.black]
+line-length = 99
+
+[tool.isort]
+profile = "black"
+line_length = 99
+skip_gitignore = true
+
+[tool.pycln]
+all = true
+
+[tool.pylint]
+ignore = [
+  "igdb_proto.py",
+]
+
+[tool.pylint.messages_control]
+disable = [
+  "invalid-name",               # C0103
+  "missing-module-docstring",   # C0114
+  "missing-class-docstring",    # C0115
+  "missing-function-docstring", # C0116
+  "line-too-long",              # C0301
+  "import-error",               # E0401
+  "no-name-in-module",          # E0611
+  "too-few-public-methods",     # R0903
+]
+
+[tool.pylint.design]
+max-args = 7                 # default 5  # R0913
+max-positional-arguments = 7 # default 5  # R0917
+
+[tool.mypy]
+enable_error_code = [
+  "ignore-without-code",
+  "mutable-override",
+  "possibly-undefined",
+  "redundant-expr",
+  "redundant-self",
+  "truthy-bool",
+  "truthy-iterable",
+  "unused-awaitable",
+]
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+extra_checks = true
+no_implicit_reexport = true
+show_column_numbers = true
+show_error_context = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+  "howlongtobeatpy.*",
+  "igdb.*",
+  "notional.*",
+]
+ignore_missing_imports = true

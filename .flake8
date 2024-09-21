@@ -1,0 +1,39 @@
+# -- Code quality ------------------------------------
+[flake8]
+extend-select =
+    # Using return x in a generator (flake8-bugbear)
+    B901
+    # Invalid first argument used for method.
+    # Use self for instance methods and cls for class methods. (flake8-bugbear)
+    B902
+    # Found a mutation of a mutable loop iterable inside the loop body (flake8-bugbear)
+    B909
+    # Line too long (flake8-bugbear)
+    B950
+    # Section is over-indented (pydocstyle)
+    D214
+    # Section underline is over-indented (pydocstyle)
+    D215
+    # All violations are disabled by default (flake8-logging-format)
+    G
+    # Manage forward references using postponed evaluation of annotations (flake8-type-checking)
+    TC1
+extend-ignore =
+    # Missing Docstrings (pydocstyle)
+    D1
+    # Whitespace before ‘,’, ‘;’, or ‘:’
+    # (Black enforces an equal amount of whitespace around slice operators)
+    E203
+    # Line too long (pycodestyle)
+    E501
+    # Multiple statements on one line (colon)
+    # (Black collapses classes/functions consisting of ... to a single line)
+    E701
+    # Line break before binary operator
+    W503
+exclude = notion_videogames/igdb_proto.py
+max-complexity = 15
+max-doc-length = 99
+max-line-length = 90
+noqa-require-code = true
+noqa-include-name = true
