@@ -20,7 +20,6 @@ class CustomGame:
 
 
 class CustomGamePage(notion.ConnectablePage[CustomGame]):
-
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
@@ -263,8 +262,6 @@ class CustomGamePage(notion.ConnectablePage[CustomGame]):
     @classmethod
     def retrieve_from_data(cls, data: CustomGame) -> Self | None:
         igdb_page = igdb_notion.Game.retrieve_or_create_from_data(data.igdb)
-        if not igdb_page:
-            return None
 
         page: Self | None = (
             cast("QueryBuilder", cls.query())

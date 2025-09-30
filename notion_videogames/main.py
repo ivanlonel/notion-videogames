@@ -10,7 +10,6 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, Final, TypedDict
 
 import notional
-import notional.orm
 import requests
 from dotenv import load_dotenv
 from igdb.wrapper import IGDBWrapper
@@ -47,21 +46,33 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 notion_db_types: dict[str, type[notion.ConnectablePage[Any]]] = {
+    "Age Rating Organizations": igdb_notion.AgeRatingOrganization,
+    "Age Rating Categories": igdb_notion.AgeRatingCategory,
     "Age Rating Content Descriptions": igdb_notion.AgeRatingContentDescription,
+    "Age Rating Content Description Types": igdb_notion.AgeRatingContentDescriptionType,
+    "Age Rating Content Descriptions V2": igdb_notion.AgeRatingContentDescriptionV2,
     "Age Ratings": igdb_notion.AgeRating,
     "Alternative Names": igdb_notion.AlternativeName,
+    "Artwork Types": igdb_notion.ArtworkType,
     "Artworks": igdb_notion.Artwork,
     "Company Logos": igdb_notion.CompanyLogo,
+    "Company Statuses": igdb_notion.CompanyStatus,
+    "Website Types": igdb_notion.WebsiteType,
     "Company Websites": igdb_notion.CompanyWebsite,
+    "Date Formats": igdb_notion.DateFormat,
     "Companies": igdb_notion.Company,
     "Covers": igdb_notion.Cover,
     "Platform Families": igdb_notion.PlatformFamily,
     "Platform Logos": igdb_notion.PlatformLogo,
+    "Platform Types": igdb_notion.PlatformType,
     "Platform Version Companies": igdb_notion.PlatformVersionCompany,
+    "Release Date Regions": igdb_notion.ReleaseDateRegion,
     "Platform Version Release Dates": igdb_notion.PlatformVersionReleaseDate,
     "Platform Versions": igdb_notion.PlatformVersion,
     "Platform Websites": igdb_notion.PlatformWebsite,
     "Platforms": igdb_notion.Platform,
+    "Game Release Formats": igdb_notion.GameReleaseFormat,
+    "External Game Sources": igdb_notion.ExternalGameSource,
     "External Games": igdb_notion.ExternalGame,
     "Franchises": igdb_notion.Franchise,
     "Game Engine Logos": igdb_notion.GameEngineLogo,
@@ -69,6 +80,8 @@ notion_db_types: dict[str, type[notion.ConnectablePage[Any]]] = {
     "Regions": igdb_notion.Region,
     "Game Localizations": igdb_notion.GameLocalization,
     "Game Modes": igdb_notion.GameMode,
+    "Game Statuses": igdb_notion.GameStatus,
+    "Game Types": igdb_notion.GameType,
     "Game Videos": igdb_notion.GameVideo,
     "Genres": igdb_notion.Genre,
     "Involved Companies": igdb_notion.InvolvedCompany,
@@ -90,10 +103,13 @@ notion_db_types: dict[str, type[notion.ConnectablePage[Any]]] = {
     # "Collection Memberships": igdb_notion.CollectionMembership,
     # "Collection Relation Types": igdb_notion.CollectionRelationType,
     # "Collection Relations": igdb_notion.CollectionRelation,
+    # "Game Times To Beat": igdb_notion.GameTimeToBeat,
     # "Game Version Feature Values": igdb_notion.GameVersionFeatureValue,
     # "Game Version Features": igdb_notion.GameVersionFeature,
     # "Game Versions": igdb_notion.GameVersion,
     # "Character Mug Shots": igdb_notion.CharacterMugShot,
+    # "Character Genders": igdb_notion.CharacterGender,
+    # "Character Species": igdb_notion.CharacterSpecie,
     # "Characters": igdb_notion.Character,
     # "Event Logos": igdb_notion.EventLogo,
     # "Network Types": igdb_notion.NetworkType,
@@ -205,8 +221,8 @@ if __name__ == "__main__":
     external_games = itertools.chain.from_iterable(
         query_igdb_external_games(
             igdb,
-            f"fields {','.join(f"game.{field}" for field in igdb_notion.Game.get_query_fields())};"
-            f"where uid=({','.join(batch)}) & category=1;"
+            f"fields {','.join(f'game.{field}' for field in igdb_notion.Game.get_query_fields())};"
+            f"where uid=({','.join(batch)}) & external_game_source=1;"
             "limit 500;",
         )
         for batch in itertools.batched(quoted_steam_appids, 25)
@@ -234,7 +250,9 @@ if __name__ == "__main__":
     # notion.ConnectablePage.update = True
 
     for game in games:
-        steam_id = next((int(eg.uid) for eg in game.external_games if eg.category == 1), None)
+        steam_id = next(
+            (int(eg.uid) for eg in game.external_games if eg.external_game_source.id == 1), None
+        )
 
         steamspy_match = steam_spy.get_steam_spy_data(steam_id) if steam_id else None
 

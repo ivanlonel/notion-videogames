@@ -2,7 +2,6 @@
 # sources: igdbapi.proto
 # plugin: python-betterproto
 # This file has been @generated
-
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
@@ -198,6 +197,7 @@ class WebsiteCategoryEnum(betterproto.Enum):
     WEBSITE_EPICGAMES = 16
     WEBSITE_GOG = 17
     WEBSITE_DISCORD = 18
+    WEBSITE_BLUESKY = 19
 
 
 class ExternalGameCategoryEnum(betterproto.Enum):
@@ -336,6 +336,33 @@ class AgeRating(betterproto.Message):
     rating_cover_url: str = betterproto.string_field(5)
     synopsis: str = betterproto.string_field(6)
     checksum: str = betterproto.string_field(7)
+    organization: "AgeRatingOrganization" = betterproto.message_field(8)
+    rating_category: "AgeRatingCategory" = betterproto.message_field(9)
+    rating_content_descriptions: list["AgeRatingContentDescriptionV2"] = betterproto.message_field(
+        10
+    )
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("AgeRating.category is deprecated", DeprecationWarning)
+        if self.is_set("rating"):
+            warnings.warn("AgeRating.rating is deprecated", DeprecationWarning)
+
+
+@dataclass(eq=False, repr=False)
+class AgeRatingCategoryResult(betterproto.Message):
+    ageratingcategories: list["AgeRatingCategory"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class AgeRatingCategory(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    rating: str = betterproto.string_field(2)
+    organization: "AgeRatingOrganization" = betterproto.message_field(3)
+    created_at: datetime = betterproto.message_field(4)
+    updated_at: datetime = betterproto.message_field(5)
+    checksum: str = betterproto.string_field(6)
 
 
 @dataclass(eq=False, repr=False)
@@ -351,6 +378,60 @@ class AgeRatingContentDescription(betterproto.Message):
     category: "AgeRatingContentDescriptionCategoryEnum" = betterproto.enum_field(2)
     description: str = betterproto.string_field(3)
     checksum: str = betterproto.string_field(4)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("AgeRatingContentDescription.category is deprecated", DeprecationWarning)
+
+
+@dataclass(eq=False, repr=False)
+class AgeRatingContentDescriptionTypeResult(betterproto.Message):
+    ageratingcontentdescriptiontypes: list["AgeRatingContentDescriptionType"] = (
+        betterproto.message_field(1)
+    )
+
+
+@dataclass(eq=False, repr=False)
+class AgeRatingContentDescriptionType(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    slug: str = betterproto.string_field(2)
+    name: str = betterproto.string_field(3)
+    created_at: datetime = betterproto.message_field(4)
+    updated_at: datetime = betterproto.message_field(5)
+    checksum: str = betterproto.string_field(6)
+
+
+@dataclass(eq=False, repr=False)
+class AgeRatingContentDescriptionV2Result(betterproto.Message):
+    ageratingcontentdescriptionsv2: list["AgeRatingContentDescriptionV2"] = (
+        betterproto.message_field(1)
+    )
+
+
+@dataclass(eq=False, repr=False)
+class AgeRatingContentDescriptionV2(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    description: str = betterproto.string_field(2)
+    organization: "AgeRatingOrganization" = betterproto.message_field(3)
+    created_at: datetime = betterproto.message_field(4)
+    updated_at: datetime = betterproto.message_field(5)
+    checksum: str = betterproto.string_field(6)
+    description_type: "AgeRatingContentDescriptionType" = betterproto.message_field(7)
+
+
+@dataclass(eq=False, repr=False)
+class AgeRatingOrganizationResult(betterproto.Message):
+    ageratingorganizations: list["AgeRatingOrganization"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class AgeRatingOrganization(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    name: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
 
 
 @dataclass(eq=False, repr=False)
@@ -383,6 +464,22 @@ class Artwork(betterproto.Message):
     url: str = betterproto.string_field(7)
     width: int = betterproto.int32_field(8)
     checksum: str = betterproto.string_field(9)
+    artwork_type: "ArtworkType" = betterproto.message_field(10)
+
+
+@dataclass(eq=False, repr=False)
+class ArtworkTypeResult(betterproto.Message):
+    artworktypes: list["ArtworkType"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class ArtworkType(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    slug: str = betterproto.string_field(2)
+    name: str = betterproto.string_field(3)
+    created_at: datetime = betterproto.message_field(4)
+    updated_at: datetime = betterproto.message_field(5)
+    checksum: str = betterproto.string_field(6)
 
 
 @dataclass(eq=False, repr=False)
@@ -406,6 +503,29 @@ class Character(betterproto.Message):
     updated_at: datetime = betterproto.message_field(12)
     url: str = betterproto.string_field(13)
     checksum: str = betterproto.string_field(14)
+    character_gender: "CharacterGender" = betterproto.message_field(15)
+    character_species: "CharacterSpecie" = betterproto.message_field(16)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("gender"):
+            warnings.warn("Character.gender is deprecated", DeprecationWarning)
+        if self.is_set("species"):
+            warnings.warn("Character.species is deprecated", DeprecationWarning)
+
+
+@dataclass(eq=False, repr=False)
+class CharacterGenderResult(betterproto.Message):
+    charactergenders: list["CharacterGender"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class CharacterGender(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    name: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
 
 
 @dataclass(eq=False, repr=False)
@@ -423,6 +543,20 @@ class CharacterMugShot(betterproto.Message):
     url: str = betterproto.string_field(6)
     width: int = betterproto.int32_field(7)
     checksum: str = betterproto.string_field(8)
+
+
+@dataclass(eq=False, repr=False)
+class CharacterSpecieResult(betterproto.Message):
+    characterspecies: list["CharacterSpecie"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class CharacterSpecie(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    name: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
 
 
 @dataclass(eq=False, repr=False)
@@ -551,6 +685,16 @@ class Company(betterproto.Message):
     url: str = betterproto.string_field(17)
     websites: list["CompanyWebsite"] = betterproto.message_field(18)
     checksum: str = betterproto.string_field(19)
+    status: "CompanyStatus" = betterproto.message_field(20)
+    start_date_format: "DateFormat" = betterproto.message_field(21)
+    change_date_format: "DateFormat" = betterproto.message_field(22)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("change_date_category"):
+            warnings.warn("Company.change_date_category is deprecated", DeprecationWarning)
+        if self.is_set("start_date_category"):
+            warnings.warn("Company.start_date_category is deprecated", DeprecationWarning)
 
 
 @dataclass(eq=False, repr=False)
@@ -571,6 +715,20 @@ class CompanyLogo(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class CompanyStatusResult(betterproto.Message):
+    companystatuses: list["CompanyStatus"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class CompanyStatus(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    name: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
+
+
+@dataclass(eq=False, repr=False)
 class CompanyWebsiteResult(betterproto.Message):
     companywebsites: list["CompanyWebsite"] = betterproto.message_field(1)
 
@@ -582,6 +740,12 @@ class CompanyWebsite(betterproto.Message):
     trusted: bool = betterproto.bool_field(3)
     url: str = betterproto.string_field(4)
     checksum: str = betterproto.string_field(5)
+    type: "WebsiteType" = betterproto.message_field(6)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("CompanyWebsite.category is deprecated", DeprecationWarning)
 
 
 @dataclass(eq=False, repr=False)
@@ -601,6 +765,20 @@ class Cover(betterproto.Message):
     width: int = betterproto.int32_field(8)
     checksum: str = betterproto.string_field(9)
     game_localization: "GameLocalization" = betterproto.message_field(10)
+
+
+@dataclass(eq=False, repr=False)
+class DateFormatResult(betterproto.Message):
+    dateformats: list["DateFormat"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class DateFormat(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    format: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
 
 
 @dataclass(eq=False, repr=False)
@@ -683,6 +861,29 @@ class ExternalGame(betterproto.Message):
     platform: "Platform" = betterproto.message_field(11)
     countries: list[int] = betterproto.int32_field(12)
     checksum: str = betterproto.string_field(13)
+    external_game_source: "ExternalGameSource" = betterproto.message_field(14)
+    game_release_format: "GameReleaseFormat" = betterproto.message_field(15)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("ExternalGame.category is deprecated", DeprecationWarning)
+        if self.is_set("media"):
+            warnings.warn("ExternalGame.media is deprecated", DeprecationWarning)
+
+
+@dataclass(eq=False, repr=False)
+class ExternalGameSourceResult(betterproto.Message):
+    externalgamesources: list["ExternalGameSource"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class ExternalGameSource(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    name: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(4)
+    updated_at: datetime = betterproto.message_field(5)
+    checksum: str = betterproto.string_field(6)
 
 
 @dataclass(eq=False, repr=False)
@@ -767,11 +968,19 @@ class Game(betterproto.Message):
     language_supports: list["LanguageSupport"] = betterproto.message_field(56)
     game_localizations: list["GameLocalization"] = betterproto.message_field(57)
     collections: list["Collection"] = betterproto.message_field(58)
+    game_status: "GameStatus" = betterproto.message_field(59)
+    game_type: "GameType" = betterproto.message_field(60)
 
     def __post_init__(self) -> None:
         super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("Game.category is deprecated", DeprecationWarning)
+        if self.is_set("collection"):
+            warnings.warn("Game.collection is deprecated", DeprecationWarning)
         if self.is_set("follows"):
             warnings.warn("Game.follows is deprecated", DeprecationWarning)
+        if self.is_set("status"):
+            warnings.warn("Game.status is deprecated", DeprecationWarning)
 
 
 @dataclass(eq=False, repr=False)
@@ -842,6 +1051,66 @@ class GameMode(betterproto.Message):
     updated_at: datetime = betterproto.message_field(5)
     url: str = betterproto.string_field(6)
     checksum: str = betterproto.string_field(7)
+
+
+@dataclass(eq=False, repr=False)
+class GameReleaseFormatResult(betterproto.Message):
+    gamereleaseformats: list["GameReleaseFormat"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class GameReleaseFormat(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    format: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
+
+
+@dataclass(eq=False, repr=False)
+class GameStatusResult(betterproto.Message):
+    gamestatuses: list["GameStatus"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class GameStatus(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    status: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
+
+
+@dataclass(eq=False, repr=False)
+class GameTimeToBeatResult(betterproto.Message):
+    gametimetobeats: list["GameTimeToBeat"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class GameTimeToBeat(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    game_id: int = betterproto.int32_field(2)
+    hastily: int = betterproto.int32_field(3)
+    normally: int = betterproto.int32_field(4)
+    completely: int = betterproto.int32_field(5)
+    count: int = betterproto.int32_field(6)
+    created_at: datetime = betterproto.message_field(7)
+    updated_at: datetime = betterproto.message_field(8)
+    checksum: str = betterproto.string_field(9)
+
+
+@dataclass(eq=False, repr=False)
+class GameTypeResult(betterproto.Message):
+    gametypes: list["GameType"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class GameType(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    type: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
 
 
 @dataclass(eq=False, repr=False)
@@ -1065,6 +1334,12 @@ class Platform(betterproto.Message):
     versions: list["PlatformVersion"] = betterproto.message_field(14)
     websites: list["PlatformWebsite"] = betterproto.message_field(15)
     checksum: str = betterproto.string_field(16)
+    platform_type: "PlatformType" = betterproto.message_field(17)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("Platform.category is deprecated", DeprecationWarning)
 
 
 @dataclass(eq=False, repr=False)
@@ -1098,6 +1373,20 @@ class PlatformLogo(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class PlatformTypeResult(betterproto.Message):
+    platformtypes: list["PlatformType"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class PlatformType(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    name: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
+
+
+@dataclass(eq=False, repr=False)
 class PlatformVersionResult(betterproto.Message):
     platformversions: list["PlatformVersion"] = betterproto.message_field(1)
 
@@ -1113,7 +1402,6 @@ class PlatformVersion(betterproto.Message):
     media: str = betterproto.string_field(7)
     memory: str = betterproto.string_field(8)
     name: str = betterproto.string_field(9)
-    online: str = betterproto.string_field(10)
     os: str = betterproto.string_field(11)
     output: str = betterproto.string_field(12)
     platform_logo: "PlatformLogo" = betterproto.message_field(13)
@@ -1162,6 +1450,15 @@ class PlatformVersionReleaseDate(betterproto.Message):
     updated_at: datetime = betterproto.message_field(9)
     y: int = betterproto.int32_field(10)
     checksum: str = betterproto.string_field(11)
+    date_format: "DateFormat" = betterproto.message_field(12)
+    release_region: "ReleaseDateRegion" = betterproto.message_field(13)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("PlatformVersionReleaseDate.category is deprecated", DeprecationWarning)
+        if self.is_set("region"):
+            warnings.warn("PlatformVersionReleaseDate.region is deprecated", DeprecationWarning)
 
 
 @dataclass(eq=False, repr=False)
@@ -1176,6 +1473,12 @@ class PlatformWebsite(betterproto.Message):
     trusted: bool = betterproto.bool_field(3)
     url: str = betterproto.string_field(4)
     checksum: str = betterproto.string_field(5)
+    type: "WebsiteType" = betterproto.message_field(6)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("PlatformWebsite.category is deprecated", DeprecationWarning)
 
 
 @dataclass(eq=False, repr=False)
@@ -1210,6 +1513,15 @@ class PopularityPrimitive(betterproto.Message):
     created_at: datetime = betterproto.message_field(7)
     updated_at: datetime = betterproto.message_field(8)
     checksum: str = betterproto.string_field(9)
+    external_popularity_source: "ExternalGameSource" = betterproto.message_field(10)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("popularity_source"):
+            warnings.warn(
+                "PopularityPrimitive.popularity_source is deprecated",
+                DeprecationWarning,
+            )
 
 
 @dataclass(eq=False, repr=False)
@@ -1225,6 +1537,12 @@ class PopularityType(betterproto.Message):
     created_at: datetime = betterproto.message_field(4)
     updated_at: datetime = betterproto.message_field(5)
     checksum: str = betterproto.string_field(6)
+    external_popularity_source: "ExternalGameSource" = betterproto.message_field(7)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("popularity_source"):
+            warnings.warn("PopularityType.popularity_source is deprecated", DeprecationWarning)
 
 
 @dataclass(eq=False, repr=False)
@@ -1263,6 +1581,30 @@ class ReleaseDate(betterproto.Message):
     y: int = betterproto.int32_field(11)
     checksum: str = betterproto.string_field(12)
     status: "ReleaseDateStatus" = betterproto.message_field(13)
+    date_format: "DateFormat" = betterproto.message_field(14)
+    release_region: "ReleaseDateRegion" = betterproto.message_field(15)
+    d: int = betterproto.int32_field(16)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("ReleaseDate.category is deprecated", DeprecationWarning)
+        if self.is_set("region"):
+            warnings.warn("ReleaseDate.region is deprecated", DeprecationWarning)
+
+
+@dataclass(eq=False, repr=False)
+class ReleaseDateRegionResult(betterproto.Message):
+    releasedateregions: list["ReleaseDateRegion"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class ReleaseDateRegion(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    region: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
 
 
 @dataclass(eq=False, repr=False)
@@ -1376,3 +1718,23 @@ class Website(betterproto.Message):
     trusted: bool = betterproto.bool_field(4)
     url: str = betterproto.string_field(5)
     checksum: str = betterproto.string_field(6)
+    type: "WebsiteType" = betterproto.message_field(7)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("category"):
+            warnings.warn("Website.category is deprecated", DeprecationWarning)
+
+
+@dataclass(eq=False, repr=False)
+class WebsiteTypeResult(betterproto.Message):
+    websitetypes: list["WebsiteType"] = betterproto.message_field(1)
+
+
+@dataclass(eq=False, repr=False)
+class WebsiteType(betterproto.Message):
+    id: int = betterproto.uint64_field(1)
+    type: str = betterproto.string_field(2)
+    created_at: datetime = betterproto.message_field(3)
+    updated_at: datetime = betterproto.message_field(4)
+    checksum: str = betterproto.string_field(5)
