@@ -1,0 +1,17 @@
+{
+  "recommendations": [
+    "charliermarsh.ruff",
+    "eamodio.gitlens",
+    "editorconfig.editorconfig",
+    "github.vscode-pull-request-github",
+    "mhutchie.git-graph",
+    "ms-python.black-formatter",
+    "ms-python.flake8",
+    "ms-python.isort",
+    "ms-python.mypy-type-checker",
+    "ms-python.pylint",
+    "ms-python.vscode-pylance",
+    "ms-python.vscode-python-envs",
+    "tamasfe.even-better-toml"
+  ]
+}

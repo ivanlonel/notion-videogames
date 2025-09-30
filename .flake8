@@ -19,8 +19,18 @@ extend-select =
     # Manage forward references using postponed evaluation of annotations (flake8-type-checking)
     TC1
 extend-ignore =
+    # A class attribute is shadowing a Python builtin
+    A003
+    # Missing type annotation for self/cls in method/classmethod
+    ANN10
+    # @classmethod does not use the cls parameter
+    CSM131
     # Missing Docstrings (pydocstyle)
     D1
+    # Use a blank line to separate the docstring from the class definition
+    D203
+    # Multi-line docstring summary should start at the first line
+    D212
     # Whitespace before ‘,’, ‘;’, or ‘:’
     # (Black enforces an equal amount of whitespace around slice operators)
     E203
@@ -29,11 +39,13 @@ extend-ignore =
     # Multiple statements on one line (colon)
     # (Black collapses classes/functions consisting of ... to a single line)
     E701
-    # Line break before binary operator
-    W503
+per-file-ignores =
+    # Needed to use a ruff noqa comment with a code flake8 does not recognize
+    notion_videogames/igdb_notion.py: NQA102
 exclude = notion_videogames/igdb_proto.py
 max-complexity = 15
 max-doc-length = 99
 max-line-length = 90
+max-cognitive-complexity = 15
 noqa-require-code = true
 noqa-include-name = true
