@@ -92,173 +92,33 @@ class IGDBNotionPage(notion.ConnectablePage[T]):
         return ("*",)
 
 
-class AgeRating(IGDBNotionPage[igdb_proto.AgeRating]):
+class AgeRatingOrganization(IGDBNotionPage[igdb_proto.AgeRatingOrganization]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            AgeRatingContentDescription._notional__database,
-            AgeRatingOrganization._notional__database,
-            AgeRatingCategory._notional__database,
-            AgeRatingContentDescriptionV2._notional__database,
-        )
+        return cls._get_notion_schema()
 
     @staticmethod
     @functools.cache
-    def _get_notion_schema(
-        age_rating_content_description_db_id: str | UUID,
-        age_rating_organization_db_id: str | UUID,
-        age_rating_category_db_id: str | UUID,
-        age_rating_content_description_v2_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.AgeRatingCategoryEnum.__members__
-                        if name != "AGERATING_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Content Descriptions": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_content_description_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Rating": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.AgeRatingRatingEnum.__members__
-                        if name != "AGERATING_RATING_NULL"
-                    ]
-                },
-            },
-            "Rating Cover URL": {"type": "url", "url": {}},
-            "Synopsis": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Organization": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_organization_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Rating Category": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_category_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Rating Content Descriptions": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_content_description_v2_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.AgeRating) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.AgeRatingOrganization) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Category": {
-                "select": (
-                    {"name": data.category.name}
-                    if data.category.name != "AGERATING_CATEGORY_NULL"
-                    else None
-                )
-            },
-            "Content Descriptions": {
-                "relation": [
-                    {"id": str(AgeRatingContentDescription.retrieve_or_create_from_data(desc).id)}
-                    for desc in data.content_descriptions
-                ]
-            },
-            "Rating": {
-                "select": (
-                    {"name": data.rating.name}
-                    if data.rating.name != "AGERATING_RATING_NULL"
-                    else None
-                )
-            },
-            "Rating Cover URL": {"url": data.rating_cover_url or None},
-            "Synopsis": {"rich_text": [{"text": {"content": data.synopsis[:MAX_TEXT_LENGTH]}}]},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Organization": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingOrganization.retrieve_or_create_from_data(
-                                data.organization
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Rating Category": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingCategory.retrieve_or_create_from_data(data.rating_category).id
-                        )
-                    }
-                ]
-            },
-            "Rating Content Descriptions": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingContentDescriptionV2.retrieve_or_create_from_data(descr).id
-                        )
-                    }
-                    for descr in data.rating_content_descriptions
-                ]
-            },
-            "Name": {
-                "title": [
-                    {
-                        "text": {
-                            "content": f"{data.organization.name} - {data.rating_category.rating}"
-                        }
-                    }
-                ]
-            },
         }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (
-                    f"content_descriptions.{f}"
-                    for f in AgeRatingContentDescription.get_query_fields()
-                ),
-                (f"organization.{f}" for f in AgeRatingOrganization.get_query_fields()),
-                (f"rating_category.{f}" for f in AgeRatingCategory.get_query_fields()),
-                (
-                    f"rating_content_descriptions.{f}"
-                    for f in AgeRatingContentDescriptionV2.get_query_fields()
-                ),
-            )
-        )
 
 
 class AgeRatingCategory(IGDBNotionPage[igdb_proto.AgeRatingCategory]):
@@ -493,33 +353,173 @@ class AgeRatingContentDescriptionV2(IGDBNotionPage[igdb_proto.AgeRatingContentDe
         )
 
 
-class AgeRatingOrganization(IGDBNotionPage[igdb_proto.AgeRatingOrganization]):
+class AgeRating(IGDBNotionPage[igdb_proto.AgeRating]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+        return cls._get_notion_schema(
+            AgeRatingContentDescription._notional__database,
+            AgeRatingOrganization._notional__database,
+            AgeRatingCategory._notional__database,
+            AgeRatingContentDescriptionV2._notional__database,
+        )
 
     @staticmethod
     @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+    def _get_notion_schema(
+        age_rating_content_description_db_id: str | UUID,
+        age_rating_organization_db_id: str | UUID,
+        age_rating_category_db_id: str | UUID,
+        age_rating_content_description_v2_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
+            "Category": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name}
+                        for name in igdb_proto.AgeRatingCategoryEnum.__members__
+                        if name != "AGERATING_CATEGORY_NULL"
+                    ]
+                },
+            },
+            "Content Descriptions": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(age_rating_content_description_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Rating": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name}
+                        for name in igdb_proto.AgeRatingRatingEnum.__members__
+                        if name != "AGERATING_RATING_NULL"
+                    ]
+                },
+            },
+            "Rating Cover URL": {"type": "url", "url": {}},
+            "Synopsis": {"type": "rich_text", "rich_text": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Organization": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(age_rating_organization_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Rating Category": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(age_rating_category_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Rating Content Descriptions": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(age_rating_content_description_v2_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.AgeRatingOrganization) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.AgeRating) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Category": {
+                "select": (
+                    {"name": data.category.name}
+                    if data.category.name != "AGERATING_CATEGORY_NULL"
+                    else None
+                )
+            },
+            "Content Descriptions": {
+                "relation": [
+                    {"id": str(AgeRatingContentDescription.retrieve_or_create_from_data(desc).id)}
+                    for desc in data.content_descriptions
+                ]
+            },
+            "Rating": {
+                "select": (
+                    {"name": data.rating.name}
+                    if data.rating.name != "AGERATING_RATING_NULL"
+                    else None
+                )
+            },
+            "Rating Cover URL": {"url": data.rating_cover_url or None},
+            "Synopsis": {"rich_text": [{"text": {"content": data.synopsis[:MAX_TEXT_LENGTH]}}]},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Organization": {
+                "relation": [
+                    {
+                        "id": str(
+                            AgeRatingOrganization.retrieve_or_create_from_data(
+                                data.organization
+                            ).id
+                        )
+                    }
+                ]
+            },
+            "Rating Category": {
+                "relation": [
+                    {
+                        "id": str(
+                            AgeRatingCategory.retrieve_or_create_from_data(data.rating_category).id
+                        )
+                    }
+                ]
+            },
+            "Rating Content Descriptions": {
+                "relation": [
+                    {
+                        "id": str(
+                            AgeRatingContentDescriptionV2.retrieve_or_create_from_data(descr).id
+                        )
+                    }
+                    for descr in data.rating_content_descriptions
+                ]
+            },
+            "Name": {
+                "title": [
+                    {
+                        "text": {
+                            "content": f"{data.organization.name} - {data.rating_category.rating}"
+                        }
+                    }
+                ]
+            },
         }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (
+                    f"content_descriptions.{f}"
+                    for f in AgeRatingContentDescription.get_query_fields()
+                ),
+                (f"organization.{f}" for f in AgeRatingOrganization.get_query_fields()),
+                (f"rating_category.{f}" for f in AgeRatingCategory.get_query_fields()),
+                (
+                    f"rating_content_descriptions.{f}"
+                    for f in AgeRatingContentDescriptionV2.get_query_fields()
+                ),
+            )
+        )
 
 
 class AlternativeName(IGDBNotionPage[igdb_proto.AlternativeName]):
@@ -553,6 +553,37 @@ class AlternativeName(IGDBNotionPage[igdb_proto.AlternativeName]):
             "ID": {"number": data.id},
             "Comment": {"rich_text": [{"text": {"content": data.comment[:MAX_TEXT_LENGTH]}}]},
             "Name": {"title": [{"text": {"content": data.name}}]},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class ArtworkType(IGDBNotionPage[igdb_proto.ArtworkType]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.ArtworkType) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
         }
 
@@ -642,233 +673,7 @@ class Artwork(IGDBNotionPage[igdb_proto.Artwork]):
         return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
-class ArtworkType(IGDBNotionPage[igdb_proto.ArtworkType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.ArtworkType) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class Character(IGDBNotionPage[igdb_proto.Character]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Game._notional__database,
-            CharacterMugShot._notional__database,
-            CharacterGender._notional__database,
-            CharacterSpecie._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        game_db_id: str | UUID,
-        character_mug_shot_db_id: str | UUID,
-        character_gender_db_id: str | UUID,
-        character_specie_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "AKAs": {"type": "multi_select", "multi_select": {}},
-            "Country Name": {"type": "rich_text", "rich_text": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Games": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Gender": {
-                "type": "select",
-                "select": {
-                    "options": [{"name": name} for name in igdb_proto.GenderGenderEnum.__members__]
-                },
-            },
-            "Mug Shot": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(character_mug_shot_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Species": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.CharacterSpeciesEnum.__members__
-                        if name != "CHARACTER_SPECIES_NULL"
-                    ]
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Character Gender": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(character_gender_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Character Species": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(character_specie_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.Character) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "AKAs": {"multi_select": [{"name": aka} for aka in data.akas]},
-            "Country Name": {"rich_text": [{"text": {"content": data.country_name}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Games": {
-                "relation": [
-                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
-                ]
-            },
-            "Gender": {"type": "select", "select": {"name": data.gender.name}},
-            "Mug Shot": {
-                "relation": [
-                    {"id": str(CharacterMugShot.retrieve_or_create_from_data(data.mug_shot).id)}
-                ]
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Species": {
-                "type": "select",
-                "select": (
-                    {"name": data.species.name}
-                    if data.species.name != "CHARACTER_SPECIES_NULL"
-                    else None
-                ),
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Character Gender": {
-                "relation": [
-                    {
-                        "id": str(
-                            CharacterGender.retrieve_or_create_from_data(data.character_gender).id
-                        )
-                    }
-                ]
-            },
-            "Character Species": {
-                "relation": [
-                    {
-                        "id": str(
-                            CharacterSpecie.retrieve_or_create_from_data(data.character_species).id
-                        )
-                    }
-                ]
-            },
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"games.{f}" for f in Game.get_query_fields()),
-                (f"mug_shot.{f}" for f in CharacterMugShot.get_query_fields()),
-                (f"character_gender.{f}" for f in CharacterGender.get_query_fields()),
-                (f"character_species.{f}" for f in CharacterSpecie.get_query_fields()),
-            )
-        )
-
-    @override
-    @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.Character,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.mug_shot.url:
-            icon_url = add_https_scheme(data.mug_shot.url)
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
-
-
-class CharacterGender(IGDBNotionPage[igdb_proto.CharacterGender]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.CharacterGender) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
+class CompanyLogo(IGDBNotionPage[igdb_proto.CompanyLogo]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
@@ -891,7 +696,7 @@ class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CharacterMugShot) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.CompanyLogo) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
             "Alpha Channel": {"checkbox": data.alpha_channel},
@@ -909,19 +714,19 @@ class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
     @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
     def retrieve_or_create_from_data(
         cls,
-        data: igdb_proto.CharacterMugShot,
+        data: igdb_proto.CompanyLogo,
         icon_url: str | None = None,
         cover_url: str | None = None,
     ) -> Self:
         if not icon_url and data.url:
-            icon_url = add_https_scheme(data.url)
+            icon_url = add_https_scheme(data.url).replace("t_thumb", "t_logo_med")
         if not cover_url and icon_url:
-            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
+            cover_url = icon_url.replace("t_thumb", "t_logo_med")
 
         return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
-class CharacterSpecie(IGDBNotionPage[igdb_proto.CharacterSpecie]):
+class CompanyStatus(IGDBNotionPage[igdb_proto.CompanyStatus]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
@@ -940,7 +745,7 @@ class CharacterSpecie(IGDBNotionPage[igdb_proto.CharacterSpecie]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CharacterSpecie) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.CompanyStatus) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
             "Name": {"title": [{"text": {"content": data.name}}]},
@@ -950,83 +755,92 @@ class CharacterSpecie(IGDBNotionPage[igdb_proto.CharacterSpecie]):
         }
 
 
-class Collection(IGDBNotionPage[igdb_proto.Collection]):
+class WebsiteType(IGDBNotionPage[igdb_proto.WebsiteType]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Game._notional__database,
-            CollectionType._notional__database,
-        )
+        return cls._get_notion_schema()
 
     @staticmethod
     @functools.cache
-    def _get_notion_schema(
-        game_db_id: str | UUID, collection_type_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
+            "Type": {"type": "title", "title": {}},
             "Created At": {"type": "date", "date": {}},
-            "Games": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.WebsiteType) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Type": {"title": [{"text": {"content": data.type}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class CompanyWebsite(IGDBNotionPage[igdb_proto.CompanyWebsite]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(WebsiteType._notional__database)
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Category": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name.removeprefix("WEBSITE_")}
+                        for name in igdb_proto.WebsiteCategoryEnum.__members__
+                        if name != "WEBSITE_CATEGORY_NULL"
+                    ]
                 },
             },
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
+            "Trusted": {"type": "checkbox", "checkbox": {}},
             "URL": {"type": "url", "url": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
             "Type": {
                 "type": "relation",
                 "relation": {
-                    "database_id": str(collection_type_db_id),
+                    "database_id": str(website_type_db_id),
                     "type": "dual_property",
                     "dual_property": {},
                 },
             },
-            # "As Parent Relations": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(collection_relation_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            # "As Child Relations": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(collection_relation_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
+            "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Collection) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.CompanyWebsite) -> dict[str, dict[str, Any]]:
+        category = (
+            data.category.name.removeprefix("WEBSITE_")
+            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
+            else None
+        )
+
         return {
             "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Games": {
-                "relation": [
-                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
-                ]
+            "Category": {
+                "type": "select",
+                "select": ({"name": category} if category else None),
             },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Trusted": {"checkbox": data.trusted},
             "URL": {"url": data.url or None},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
             "Type": {
-                "relation": [
-                    {"id": str(CollectionType.retrieve_or_create_from_data(data.type).id)}
-                ]
+                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
             },
+            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
         }
 
     @override
@@ -1036,374 +850,12 @@ class Collection(IGDBNotionPage[igdb_proto.Collection]):
         return tuple(
             itertools.chain(
                 super().get_query_fields(),
-                (f"games.{f}" for f in Game.get_query_fields()),
-                (f"type.{f}" for f in CollectionType.get_query_fields()),
-                # (
-                #     f"as_parent_relations.{f}"
-                #     for f in CollectionRelation.get_query_fields()
-                # ),
-                # (
-                #     f"as_child_relations.{f}"
-                #     for f in CollectionRelation.get_query_fields()
-                # ),
+                (f"type.{f}" for f in WebsiteType.get_query_fields()),
             )
         )
 
 
-class CollectionMembership(IGDBNotionPage[igdb_proto.CollectionMembership]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Game._notional__database,
-            Collection._notional__database,
-            CollectionMembershipType._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        game_db_id: str | UUID,
-        collection_db_id: str | UUID,
-        collection_membership_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Game": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Collection": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_membership_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @classmethod
-    def get_notion_properties(
-        cls, data: igdb_proto.CollectionMembership
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
-            "Collection": {
-                "relation": [
-                    {"id": str(Collection.retrieve_or_create_from_data(data.collection).id)}
-                ]
-            },
-            "Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            CollectionMembershipType.retrieve_or_create_from_data(data.type).id
-                        )
-                    }
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {
-                "title": [
-                    {
-                        "text": {
-                            "content": f"{data.game.name} - {data.collection.name}"
-                            f" - {data.type.name}"
-                        }
-                    }
-                ]
-            },
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"game.{f}" for f in Game.get_query_fields()),
-                (f"collection.{f}" for f in Collection.get_query_fields()),
-                (f"type.{f}" for f in CollectionMembershipType.get_query_fields()),
-            )
-        )
-
-
-class CollectionMembershipType(IGDBNotionPage[igdb_proto.CollectionMembershipType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            CollectionType._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        collection_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Allowed Collection Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(
-        data: igdb_proto.CollectionMembershipType,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Allowed Collection Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            CollectionType.retrieve_or_create_from_data(
-                                data.allowed_collection_type
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"allowed_collection_type.{f}" for f in CollectionType.get_query_fields()),
-            )
-        )
-
-
-class CollectionRelation(IGDBNotionPage[igdb_proto.CollectionRelation]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Collection._notional__database,
-            CollectionRelationType._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        collection_db_id: str | UUID, collection_relation_type_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Child Collection": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Parent Collection": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_relation_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @classmethod
-    def get_notion_properties(
-        cls, data: igdb_proto.CollectionRelation
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Child Collection": {
-                "relation": [
-                    {"id": str(Collection.retrieve_or_create_from_data(data.child_collection).id)}
-                ]
-            },
-            "Parent Collection": {
-                "relation": [
-                    {"id": str(Collection.retrieve_or_create_from_data(data.parent_collection).id)}
-                ]
-            },
-            "Type": {
-                "relation": [
-                    {"id": str(CollectionRelationType.retrieve_or_create_from_data(data.type).id)}
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {
-                "title": [
-                    {
-                        "text": {
-                            "content": f"{data.parent_collection.name}"
-                            f" - {data.child_collection.name} - {data.type.name}"
-                        }
-                    }
-                ]
-            },
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"child_collection.{f}" for f in Collection.get_query_fields()),
-                (f"parent_collection.{f}" for f in Collection.get_query_fields()),
-                (f"type.{f}" for f in CollectionRelationType.get_query_fields()),
-            )
-        )
-
-
-class CollectionRelationType(IGDBNotionPage[igdb_proto.CollectionRelationType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            CollectionType._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        collection_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Allowed Child Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Allowed Parent Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(
-        data: igdb_proto.CollectionRelationType,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Allowed Child Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            CollectionType.retrieve_or_create_from_data(data.allowed_child_type).id
-                        )
-                    }
-                ]
-            },
-            "Allowed Parent Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            CollectionType.retrieve_or_create_from_data(
-                                data.allowed_parent_type
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"allowed_child_type.{f}" for f in CollectionType.get_query_fields()),
-                (f"allowed_parent_type.{f}" for f in CollectionType.get_query_fields()),
-            )
-        )
-
-
-class CollectionType(IGDBNotionPage[igdb_proto.CollectionType]):
+class DateFormat(IGDBNotionPage[igdb_proto.DateFormat]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
@@ -1414,22 +866,18 @@ class CollectionType(IGDBNotionPage[igdb_proto.CollectionType]):
     def _get_notion_schema() -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
+            "Format": {"type": "title", "title": {}},
             "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CollectionType) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.DateFormat) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
+            "Format": {"title": [{"text": {"content": data.format}}]},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
@@ -1641,159 +1089,6 @@ class Company(IGDBNotionPage[igdb_proto.Company]):
         return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
-class CompanyLogo(IGDBNotionPage[igdb_proto.CompanyLogo]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.CompanyLogo) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.CompanyLogo,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.url:
-            icon_url = add_https_scheme(data.url).replace("t_thumb", "t_logo_med")
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("t_thumb", "t_logo_med")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
-
-
-class CompanyStatus(IGDBNotionPage[igdb_proto.CompanyStatus]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.CompanyStatus) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class CompanyWebsite(IGDBNotionPage[igdb_proto.CompanyWebsite]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(WebsiteType._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name.removeprefix("WEBSITE_")}
-                        for name in igdb_proto.WebsiteCategoryEnum.__members__
-                        if name != "WEBSITE_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Trusted": {"type": "checkbox", "checkbox": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(website_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.CompanyWebsite) -> dict[str, dict[str, Any]]:
-        category = (
-            data.category.name.removeprefix("WEBSITE_")
-            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
-            else None
-        )
-
-        return {
-            "ID": {"number": data.id},
-            "Category": {
-                "type": "select",
-                "select": ({"name": category} if category else None),
-            },
-            "Trusted": {"checkbox": data.trusted},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Type": {
-                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
-            },
-            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"type.{f}" for f in WebsiteType.get_query_fields()),
-            )
-        )
-
-
 class Cover(IGDBNotionPage[igdb_proto.Cover]):
     @override
     @classmethod
@@ -1855,7 +1150,36 @@ class Cover(IGDBNotionPage[igdb_proto.Cover]):
         return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
-class DateFormat(IGDBNotionPage[igdb_proto.DateFormat]):
+class ExternalGameSource(IGDBNotionPage[igdb_proto.ExternalGameSource]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.ExternalGameSource) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class GameReleaseFormat(IGDBNotionPage[igdb_proto.GameReleaseFormat]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
@@ -1874,7 +1198,7 @@ class DateFormat(IGDBNotionPage[igdb_proto.DateFormat]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.DateFormat) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.GameReleaseFormat) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
             "Format": {"title": [{"text": {"content": data.format}}]},
@@ -1884,144 +1208,7 @@ class DateFormat(IGDBNotionPage[igdb_proto.DateFormat]):
         }
 
 
-class Event(IGDBNotionPage[igdb_proto.Event]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            EventLogo._notional__database,
-            Game._notional__database,
-            GameVideo._notional__database,
-            EventNetwork._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        event_logo_db_id: str | UUID,
-        game_db_id: str | UUID,
-        game_video_db_id: str | UUID,
-        event_network_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Event Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(event_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Start Time": {"type": "date", "date": {}},
-            "Time Zone": {"type": "rich_text", "rich_text": {}},
-            "End Time": {"type": "date", "date": {}},
-            "Live Stream URL": {"type": "url", "url": {}},
-            "Games": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Videos": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_video_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Event Networks": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(event_network_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.Event) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Event Logo": {
-                "relation": [
-                    {"id": str(EventLogo.retrieve_or_create_from_data(data.event_logo).id)}
-                ]
-            },
-            "Start Time": {"type": "date", "date": {"start": data.start_time.isoformat()}},
-            "Time Zone": {"rich_text": [{"text": {"content": data.time_zone}}]},
-            "End Time": {"type": "date", "date": {"start": data.end_time.isoformat()}},
-            "Live Stream URL": {"url": data.live_stream_url},
-            "Games": {
-                "relation": [
-                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
-                ]
-            },
-            "Videos": {
-                "relation": [
-                    {"id": str(GameVideo.retrieve_or_create_from_data(vid).id)}
-                    for vid in data.videos
-                ]
-            },
-            "Event Networks": {
-                "relation": [
-                    {"id": str(EventNetwork.retrieve_or_create_from_data(n).id)}
-                    for n in data.event_networks
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"event_logo.{f}" for f in EventLogo.get_query_fields()),
-                (f"games.{f}" for f in Game.get_query_fields()),
-                (f"videos.{f}" for f in GameVideo.get_query_fields()),
-                (f"event_networks.{f}" for f in EventNetwork.get_query_fields()),
-            )
-        )
-
-    @override
-    @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.Event,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.event_logo.url:
-            icon_url = add_https_scheme(data.event_logo.url)
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("/t_thumb/", "/t_original/")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
-
-
-class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
+class PlatformFamily(IGDBNotionPage[igdb_proto.PlatformFamily]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
@@ -2032,29 +1219,46 @@ class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
     def _get_notion_schema() -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            # "Event": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(event_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
+            "Name": {"type": "title", "title": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.PlatformFamily) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class PlatformLogo(IGDBNotionPage[igdb_proto.PlatformLogo]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
             "Alpha Channel": {"type": "checkbox", "checkbox": {}},
             "Animated": {"type": "checkbox", "checkbox": {}},
             "Height": {"type": "number", "number": {"format": "number"}},
             "Image ID": {"type": "rich_text", "rich_text": {}},
             "URL": {"type": "url", "url": {}},
             "Width": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
             "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.EventLogo) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.PlatformLogo) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
             "Alpha Channel": {"checkbox": data.alpha_channel},
@@ -2063,8 +1267,6 @@ class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
             "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
             "URL": {"url": data.url or None},
             "Width": {"number": data.width},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
             "Name": {"title": [{"text": {"content": str(data.id)}}]},
         }
@@ -2074,67 +1276,88 @@ class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
     @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
     def retrieve_or_create_from_data(
         cls,
-        data: igdb_proto.EventLogo,
+        data: igdb_proto.PlatformLogo,
         icon_url: str | None = None,
         cover_url: str | None = None,
     ) -> Self:
         if not icon_url and data.url:
-            icon_url = add_https_scheme(data.url)
+            icon_url = add_https_scheme(data.url).replace("t_thumb", "t_logo_med")
         if not cover_url and icon_url:
-            cover_url = icon_url.replace("/t_thumb/", "/t_original/")
+            cover_url = icon_url.replace("t_thumb", "t_logo_med")
 
         return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
-class EventNetwork(IGDBNotionPage[igdb_proto.EventNetwork]):
+class PlatformType(IGDBNotionPage[igdb_proto.PlatformType]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(NetworkType._notional__database)
+        return cls._get_notion_schema()
 
     @staticmethod
     @functools.cache
-    def _get_notion_schema(network_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            # "Event": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(event_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "URL": {"type": "url", "url": {}},
-            "Network Type": {
+            "Name": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.PlatformType) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class PlatformVersionCompany(IGDBNotionPage[igdb_proto.PlatformVersionCompany]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(Company._notional__database)
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(company_db_id: str | UUID) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Comment": {"type": "rich_text", "rich_text": {}},
+            "Company": {
                 "type": "relation",
                 "relation": {
-                    "database_id": str(network_type_db_id),
+                    "database_id": str(company_db_id),
                     "type": "dual_property",
                     "dual_property": {},
                 },
             },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
+            "Developer": {"type": "checkbox", "checkbox": {}},
+            "Manufacturer": {"type": "checkbox", "checkbox": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
             "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.EventNetwork) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(
+        data: igdb_proto.PlatformVersionCompany,
+    ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "URL": {"url": data.url or None},
-            "Network Type": {
-                "relation": [
-                    {"id": str(NetworkType.retrieve_or_create_from_data(data.network_type).id)}
-                ]
+            "Comment": {"rich_text": [{"text": {"content": data.comment[:MAX_TEXT_LENGTH]}}]},
+            "Company": {
+                "relation": [{"id": str(Company.retrieve_or_create_from_data(data.company).id)}]
             },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Developer": {"checkbox": data.developer},
+            "Manufacturer": {"checkbox": data.manufacturer},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": f"{data.network_type.name} - {data.id}"}}]},
+            "Name": {"title": [{"text": {"content": f"{data.company.name} - {data.id}"}}]},
         }
 
     @override
@@ -2144,10 +1367,561 @@ class EventNetwork(IGDBNotionPage[igdb_proto.EventNetwork]):
         return tuple(
             itertools.chain(
                 super().get_query_fields(),
-                # (f"event.{f}" for f in Event.get_query_fields()),
-                (f"network_type.{f}" for f in NetworkType.get_query_fields()),
+                (f"company.{f}" for f in Company.get_query_fields()),
             )
         )
+
+
+class ReleaseDateRegion(IGDBNotionPage[igdb_proto.ReleaseDateRegion]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Region": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.ReleaseDateRegion) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Region": {"title": [{"text": {"content": data.region}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleaseDate]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            DateFormat._notional__database, ReleaseDateRegion._notional__database
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        date_format_db_id: str | UUID, release_date_region_db_id: str | UUID
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Category": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name}
+                        for name in igdb_proto.DateFormatChangeDateCategoryEnum.__members__
+                    ]
+                },
+            },
+            "Created At": {"type": "date", "date": {}},
+            "Date": {"type": "date", "date": {}},
+            "Human": {"type": "rich_text", "rich_text": {}},
+            "M": {"type": "number", "number": {"format": "number"}},
+            # "Platform Version": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(platform_version_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Region": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name}
+                        for name in igdb_proto.RegionRegionEnum.__members__
+                        if name != "REGION_REGION_NULL"
+                    ]
+                },
+            },
+            "Updated At": {"type": "date", "date": {}},
+            "Y": {"type": "number", "number": {"format": "number"}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Date Format": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(date_format_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Release Region": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(release_date_region_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(
+        data: igdb_proto.PlatformVersionReleaseDate,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Category": {"type": "select", "select": {"name": data.category.name}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Date": {"type": "date", "date": {"start": data.date.isoformat()}},
+            "Human": {"rich_text": [{"text": {"content": data.human}}]},
+            "M": {"number": data.m},
+            "Region": {
+                "type": "select",
+                "select": (
+                    {"name": data.region.name}
+                    if data.region.name != "REGION_REGION_NULL"
+                    else None
+                ),
+            },
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Y": {"number": data.y},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Date Format": {
+                "relation": [
+                    {"id": str(DateFormat.retrieve_or_create_from_data(data.date_format).id)}
+                ]
+            },
+            "Release Region": {
+                "relation": [
+                    {
+                        "id": str(
+                            ReleaseDateRegion.retrieve_or_create_from_data(data.release_region).id
+                        )
+                    }
+                ]
+            },
+            "Name": {"title": [{"text": {"content": f"{data.y}/{data.m}"}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"date_format.{f}" for f in DateFormat.get_query_fields()),
+                (f"release_region.{f}" for f in ReleaseDateRegion.get_query_fields()),
+            )
+        )
+
+
+class PlatformVersion(IGDBNotionPage[igdb_proto.PlatformVersion]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            PlatformVersionCompany._notional__database,
+            PlatformLogo._notional__database,
+            PlatformVersionReleaseDate._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        platform_version_company_db_id: str | UUID,
+        platform_logo_db_id: str | UUID,
+        platform_version_release_date_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Companies": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_version_company_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Connectivity": {"type": "rich_text", "rich_text": {}},
+            "CPU": {"type": "rich_text", "rich_text": {}},
+            "Graphics": {"type": "rich_text", "rich_text": {}},
+            "Main Manufacturer": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_version_company_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Media": {"type": "rich_text", "rich_text": {}},
+            "Memory": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},
+            "OS": {"type": "rich_text", "rich_text": {}},
+            "Output": {"type": "rich_text", "rich_text": {}},
+            "Platform Logo": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_logo_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Release Dates": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_version_release_date_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Resolutions": {"type": "rich_text", "rich_text": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Sound": {"type": "rich_text", "rich_text": {}},
+            "Storage": {"type": "rich_text", "rich_text": {}},
+            "Summary": {"type": "rich_text", "rich_text": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.PlatformVersion) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Companies": {
+                "relation": [
+                    {"id": str(PlatformVersionCompany.retrieve_or_create_from_data(company).id)}
+                    for company in data.companies
+                ]
+            },
+            "Connectivity": {"rich_text": [{"text": {"content": data.connectivity}}]},
+            "CPU": {"rich_text": [{"text": {"content": data.cpu}}]},
+            "Graphics": {"rich_text": [{"text": {"content": data.graphics}}]},
+            "Main Manufacturer": {
+                "relation": [
+                    {
+                        "id": str(
+                            PlatformVersionCompany.retrieve_or_create_from_data(
+                                data.main_manufacturer
+                            ).id
+                        )
+                    }
+                ]
+            },
+            "Media": {"rich_text": [{"text": {"content": data.media}}]},
+            "Memory": {"rich_text": [{"text": {"content": data.memory}}]},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "OS": {"rich_text": [{"text": {"content": data.os}}]},
+            "Output": {"rich_text": [{"text": {"content": data.output}}]},
+            "Platform Logo": {
+                "relation": [
+                    {"id": str(PlatformLogo.retrieve_or_create_from_data(data.platform_logo).id)}
+                ]
+            },
+            "Release Dates": {
+                "relation": [
+                    {
+                        "id": str(
+                            PlatformVersionReleaseDate.retrieve_or_create_from_data(
+                                release_date
+                            ).id
+                        )
+                    }
+                    for release_date in data.platform_version_release_dates
+                ]
+            },
+            "Resolutions": {"rich_text": [{"text": {"content": data.resolutions}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Sound": {"rich_text": [{"text": {"content": data.sound}}]},
+            "Storage": {"rich_text": [{"text": {"content": data.storage}}]},
+            "Summary": {"rich_text": [{"text": {"content": data.summary[:MAX_TEXT_LENGTH]}}]},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"companies.{f}" for f in PlatformVersionCompany.get_query_fields()),
+                (f"main_manufacturer.{f}" for f in PlatformVersionCompany.get_query_fields()),
+                (f"platform_logo.{f}" for f in PlatformLogo.get_query_fields()),
+                (
+                    f"platform_version_release_dates.{f}"
+                    for f in PlatformVersionReleaseDate.get_query_fields()
+                ),
+            )
+        )
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.PlatformVersion,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.platform_logo.url:
+            icon_url = add_https_scheme(data.platform_logo.url).replace("t_thumb", "t_logo_med")
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("t_thumb", "t_logo_med")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+
+
+class PlatformWebsite(IGDBNotionPage[igdb_proto.PlatformWebsite]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(WebsiteType._notional__database)
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Category": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name.removeprefix("WEBSITE_")}
+                        for name in igdb_proto.WebsiteCategoryEnum.__members__
+                        if name != "WEBSITE_CATEGORY_NULL"
+                    ]
+                },
+            },
+            "Trusted": {"type": "checkbox", "checkbox": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(website_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.PlatformWebsite) -> dict[str, dict[str, Any]]:
+        category = (
+            data.category.name.removeprefix("WEBSITE_")
+            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
+            else None
+        )
+
+        return {
+            "ID": {"number": data.id},
+            "Category": {
+                "type": "select",
+                "select": ({"name": category} if category else None),
+            },
+            "Trusted": {"checkbox": data.trusted},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Type": {
+                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
+            },
+            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"type.{f}" for f in WebsiteType.get_query_fields()),
+            )
+        )
+
+
+class Platform(IGDBNotionPage[igdb_proto.Platform]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            PlatformLogo._notional__database,
+            PlatformFamily._notional__database,
+            PlatformVersion._notional__database,
+            PlatformWebsite._notional__database,
+            PlatformType._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        platform_logo_db_id: str | UUID,
+        platform_family_db_id: str | UUID,
+        platform_version_db_id: str | UUID,
+        platform_website_db_id: str | UUID,
+        platform_type_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Abbreviation": {"type": "rich_text", "rich_text": {}},
+            "Alternative Name": {"type": "rich_text", "rich_text": {}},
+            "Category": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name}
+                        for name in igdb_proto.PlatformCategoryEnum.__members__
+                        if name != "PLATFORM_CATEGORY_NULL"
+                    ]
+                },
+            },
+            "Created At": {"type": "date", "date": {}},
+            "Generation": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Platform Logo": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_logo_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Platform Family": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_family_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Summary": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "URL": {"type": "url", "url": {}},
+            "Versions": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_version_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Websites": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_website_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Platform Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Platform) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Abbreviation": {"rich_text": [{"text": {"content": data.abbreviation}}]},
+            "Alternative Name": {"rich_text": [{"text": {"content": data.alternative_name}}]},
+            "Category": {
+                "type": "select",
+                "select": (
+                    {"name": data.category.name}
+                    if data.category.name != "PLATFORM_CATEGORY_NULL"
+                    else None
+                ),
+            },
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Generation": {"number": data.generation},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Platform Logo": {
+                "relation": [
+                    {"id": str(PlatformLogo.retrieve_or_create_from_data(data.platform_logo).id)}
+                ]
+            },
+            "Platform Family": {
+                "relation": [
+                    {
+                        "id": str(
+                            PlatformFamily.retrieve_or_create_from_data(data.platform_family).id
+                        )
+                    }
+                ]
+            },
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Summary": {"rich_text": [{"text": {"content": data.summary[:MAX_TEXT_LENGTH]}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
+            "Versions": {
+                "relation": [
+                    {"id": str(PlatformVersion.retrieve_or_create_from_data(ver).id)}
+                    for ver in data.versions
+                ]
+            },
+            "Websites": {
+                "relation": [
+                    {"id": str(PlatformWebsite.retrieve_or_create_from_data(ws).id)}
+                    for ws in data.websites
+                ]
+            },
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Platform Type": {
+                "relation": [
+                    {"id": str(PlatformType.retrieve_or_create_from_data(data.platform_type).id)}
+                ]
+            },
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"platform_logo.{f}" for f in PlatformLogo.get_query_fields()),
+                (f"platform_family.{f}" for f in PlatformFamily.get_query_fields()),
+                (f"versions.{f}" for f in PlatformVersion.get_query_fields()),
+                (f"websites.{f}" for f in PlatformWebsite.get_query_fields()),
+                (f"platform_type.{f}" for f in PlatformType.get_query_fields()),
+            )
+        )
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.Platform,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.platform_logo.url:
+            icon_url = add_https_scheme(data.platform_logo.url).replace("t_thumb", "t_logo_med")
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("t_thumb", "t_logo_med")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
 class ExternalGame(IGDBNotionPage[igdb_proto.ExternalGame]):
@@ -2302,35 +2076,6 @@ class ExternalGame(IGDBNotionPage[igdb_proto.ExternalGame]):
         )
 
 
-class ExternalGameSource(IGDBNotionPage[igdb_proto.ExternalGameSource]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.ExternalGameSource) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
 class Franchise(IGDBNotionPage[igdb_proto.Franchise]):
     @override
     @classmethod
@@ -2370,6 +2115,1207 @@ class Franchise(IGDBNotionPage[igdb_proto.Franchise]):
             "URL": {"url": data.url or None},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
         }
+
+
+class GameEngineLogo(IGDBNotionPage[igdb_proto.GameEngineLogo]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
+            "Animated": {"type": "checkbox", "checkbox": {}},
+            "Height": {"type": "number", "number": {"format": "number"}},
+            "Image ID": {"type": "rich_text", "rich_text": {}},
+            "URL": {"type": "url", "url": {}},
+            "Width": {"type": "number", "number": {"format": "number"}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.GameEngineLogo) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Alpha Channel": {"checkbox": data.alpha_channel},
+            "Animated": {"checkbox": data.animated},
+            "Height": {"number": data.height},
+            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
+            "URL": {"url": data.url or None},
+            "Width": {"number": data.width},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.GameEngineLogo,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.url:
+            icon_url = add_https_scheme(data.url)
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+
+
+class GameEngine(IGDBNotionPage[igdb_proto.GameEngine]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            Company._notional__database,
+            GameEngineLogo._notional__database,
+            Platform._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        company_db_id: str | UUID, game_engine_logo_db_id: str | UUID, platform_db_id: str | UUID
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Companies": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(company_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Created At": {"type": "date", "date": {}},
+            "Description": {"type": "rich_text", "rich_text": {}},
+            "Logo": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(game_engine_logo_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Name": {"type": "title", "title": {}},
+            "Platforms": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.GameEngine) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Companies": {
+                "relation": [
+                    {"id": str(Company.retrieve_or_create_from_data(comp).id)}
+                    for comp in data.companies
+                ]
+            },
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Description": {
+                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
+            },
+            "Logo": {
+                "relation": [
+                    {"id": str(GameEngineLogo.retrieve_or_create_from_data(data.logo).id)}
+                ]
+            },
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Platforms": {
+                "relation": [
+                    {"id": str(Platform.retrieve_or_create_from_data(platf).id)}
+                    for platf in data.platforms
+                ]
+            },
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"companies.{f}" for f in Company.get_query_fields()),
+                (f"logo.{f}" for f in GameEngineLogo.get_query_fields()),
+                (f"platforms.{f}" for f in Platform.get_query_fields()),
+            )
+        )
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.GameEngine,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.logo.url:
+            icon_url = add_https_scheme(data.logo.url)
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+
+
+class Region(IGDBNotionPage[igdb_proto.Region]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Category": {"type": "rich_text", "rich_text": {}},
+            "Identifier": {"type": "rich_text", "rich_text": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Region) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Category": {"rich_text": [{"text": {"content": data.category}}]},
+            "Identifier": {"rich_text": [{"text": {"content": data.identifier}}]},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class GameLocalization(IGDBNotionPage[igdb_proto.GameLocalization]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            Cover._notional__database,
+            Region._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        cover_db_id: str | UUID, region_db_id: str | UUID
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Cover": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(cover_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Region": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(region_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            # "Game": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.GameLocalization) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Cover": {
+                "relation": [{"id": str(Cover.retrieve_or_create_from_data(data.cover).id)}]
+            },
+            "Region": {
+                "relation": [{"id": str(Region.retrieve_or_create_from_data(data.region).id)}]
+            },
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                # (f"game.{f}" for f in Game.get_query_fields()),
+                (f"cover.{f}" for f in Cover.get_query_fields()),
+                (f"region.{f}" for f in Region.get_query_fields()),
+            )
+        )
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.GameLocalization,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.cover.url:
+            icon_url = add_https_scheme(data.cover.url)
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+
+
+class GameMode(IGDBNotionPage[igdb_proto.GameMode]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Created At": {"type": "date", "date": {}},
+            "Name": {"type": "title", "title": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.GameMode) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class GameStatus(IGDBNotionPage[igdb_proto.GameStatus]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Status": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.GameStatus) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Status": {"title": [{"text": {"content": data.status}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class GameType(IGDBNotionPage[igdb_proto.GameType]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Type": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.GameType) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Type": {"title": [{"text": {"content": data.type}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class GameVideo(IGDBNotionPage[igdb_proto.GameVideo]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            # "Game": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Name": {"type": "title", "title": {}},
+            "Video ID": {"type": "rich_text", "rich_text": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.GameVideo) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Video ID": {"rich_text": [{"text": {"content": data.video_id}}]},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class Genre(IGDBNotionPage[igdb_proto.Genre]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Created At": {"type": "date", "date": {}},
+            "Name": {"type": "title", "title": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Genre) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class InvolvedCompany(IGDBNotionPage[igdb_proto.InvolvedCompany]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(Company._notional__database)
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(company_db_id: str | UUID) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Company": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(company_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Created At": {"type": "date", "date": {}},
+            "Developer": {"type": "checkbox", "checkbox": {}},
+            "Porting": {"type": "checkbox", "checkbox": {}},
+            "Publisher": {"type": "checkbox", "checkbox": {}},
+            "Supporting": {"type": "checkbox", "checkbox": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            # "Game": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.InvolvedCompany) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Company": {
+                "relation": [{"id": str(Company.retrieve_or_create_from_data(data.company).id)}]
+            },
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Developer": {"checkbox": data.developer},
+            "Porting": {"checkbox": data.porting},
+            "Publisher": {"checkbox": data.publisher},
+            "Supporting": {"checkbox": data.supporting},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {"title": [{"text": {"content": data.company.name}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"company.{f}" for f in Company.get_query_fields()),
+            )
+        )
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.InvolvedCompany,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.company.logo.url:
+            icon_url = add_https_scheme(data.company.logo.url).replace("t_thumb", "t_logo_med")
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("t_thumb", "t_logo_med")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+
+
+class Keyword(IGDBNotionPage[igdb_proto.Keyword]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Created At": {"type": "date", "date": {}},
+            "Name": {"type": "title", "title": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Keyword) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class Language(IGDBNotionPage[igdb_proto.Language]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Native Name": {"type": "rich_text", "rich_text": {}},
+            "Locale": {"type": "rich_text", "rich_text": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Language) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Native Name": {"rich_text": [{"text": {"content": data.native_name}}]},
+            "Locale": {"rich_text": [{"text": {"content": data.locale}}]},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class LanguageSupportType(IGDBNotionPage[igdb_proto.LanguageSupportType]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @classmethod
+    def get_notion_properties(
+        cls, data: igdb_proto.LanguageSupportType
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class LanguageSupport(IGDBNotionPage[igdb_proto.LanguageSupport]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            Language._notional__database,
+            LanguageSupportType._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        language_db_id: str | UUID, language_support_type_db_id: str | UUID
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            # "Game": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Language": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(language_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Language Support Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(language_support_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.LanguageSupport) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Language": {
+                "relation": [{"id": str(Language.retrieve_or_create_from_data(data.language).id)}]
+            },
+            "Language Support Type": {
+                "relation": [
+                    {
+                        "id": str(
+                            LanguageSupportType.retrieve_or_create_from_data(
+                                data.language_support_type
+                            ).id
+                        )
+                    }
+                ]
+            },
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {
+                "title": [
+                    {
+                        "text": {
+                            "content": f"{data.language.name} - {data.language_support_type.name}"
+                        }
+                    }
+                ]
+            },
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                # (f"game.{f}" for f in Game.get_query_fields()),
+                (f"language.{f}" for f in Language.get_query_fields()),
+                (f"language_support_type.{f}" for f in LanguageSupportType.get_query_fields()),
+            )
+        )
+
+
+class MultiplayerMode(IGDBNotionPage[igdb_proto.MultiplayerMode]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(Platform._notional__database)
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(platform_db_id: str | UUID) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Campaign Coop": {"type": "checkbox", "checkbox": {}},
+            "Drop In": {"type": "checkbox", "checkbox": {}},
+            # "Game": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "LAN Coop": {"type": "checkbox", "checkbox": {}},
+            "Offline Coop": {"type": "checkbox", "checkbox": {}},
+            "Offline Coop Max": {"type": "number", "number": {"format": "number"}},
+            "Offline Max": {"type": "number", "number": {"format": "number"}},
+            "Online Coop": {"type": "checkbox", "checkbox": {}},
+            "Online Coop Max": {"type": "number", "number": {"format": "number"}},
+            "Online Max": {"type": "number", "number": {"format": "number"}},
+            "Platform": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Split Screen": {"type": "checkbox", "checkbox": {}},
+            "Split Screen Online": {"type": "checkbox", "checkbox": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.MultiplayerMode) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Campaign Coop": {"checkbox": data.campaigncoop},
+            "Drop In": {"checkbox": data.dropin},
+            "LAN Coop": {"checkbox": data.lancoop},
+            "Offline Coop": {"checkbox": data.offlinecoop},
+            "Offline Coop Max": {"number": data.offlinecoopmax},
+            "Offline Max": {"number": data.offlinemax},
+            "Online Coop": {"checkbox": data.onlinecoop},
+            "Online Coop Max": {"number": data.onlinecoopmax},
+            "Online Max": {"number": data.onlinemax},
+            "Platform": {
+                "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
+            },
+            "Split Screen": {"checkbox": data.splitscreen},
+            "Split Screen Online": {"checkbox": data.splitscreenonline},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {"title": [{"text": {"content": f"{data.platform.name} - {data.id}"}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                # (f"game.{f}" for f in Game.get_query_fields()),
+                (f"platform.{f}" for f in Platform.get_query_fields()),
+            )
+        )
+
+
+class PlayerPerspective(IGDBNotionPage[igdb_proto.PlayerPerspective]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Created At": {"type": "date", "date": {}},
+            "Name": {"type": "title", "title": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @classmethod
+    def get_notion_properties(
+        cls, data: igdb_proto.PlayerPerspective
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class ReleaseDateStatus(IGDBNotionPage[igdb_proto.ReleaseDateStatus]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Description": {"type": "rich_text", "rich_text": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @classmethod
+    def get_notion_properties(
+        cls, data: igdb_proto.ReleaseDateStatus
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Description": {
+                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
+            },
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class ReleaseDate(IGDBNotionPage[igdb_proto.ReleaseDate]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            Platform._notional__database,
+            ReleaseDateStatus._notional__database,
+            DateFormat._notional__database,
+            ReleaseDateRegion._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        platform_db_id: str | UUID,
+        release_date_status_db_id: str | UUID,
+        date_format_db_id: str | UUID,
+        release_date_region_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Category": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name}
+                        for name in igdb_proto.DateFormatChangeDateCategoryEnum.__members__
+                    ]
+                },
+            },
+            "Created At": {"type": "date", "date": {}},
+            "Date": {"type": "date", "date": {}},
+            # "Game": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Human": {"type": "rich_text", "rich_text": {}},
+            "M": {"type": "number", "number": {"format": "number"}},
+            "Platform": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(platform_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Region": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name}
+                        for name in igdb_proto.RegionRegionEnum.__members__
+                        if name != "REGION_REGION_NULL"
+                    ]
+                },
+            },
+            "Updated At": {"type": "date", "date": {}},
+            "Y": {"type": "number", "number": {"format": "number"}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Status": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(release_date_status_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Date Format": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(date_format_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Release Region": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(release_date_region_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "D": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.ReleaseDate) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Category": {"type": "select", "select": {"name": data.category.name}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Date": {"type": "date", "date": {"start": data.date.isoformat()}},
+            "Human": {"rich_text": [{"text": {"content": data.human}}]},
+            "M": {"number": data.m},
+            "Platform": {
+                "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
+            },
+            "Region": {
+                "type": "select",
+                "select": (
+                    {"name": data.region.name}
+                    if data.region.name != "REGION_REGION_NULL"
+                    else None
+                ),
+            },
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Y": {"number": data.y},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Status": {
+                "relation": [
+                    {"id": str(ReleaseDateStatus.retrieve_or_create_from_data(data.status).id)}
+                ]
+            },
+            "Date Format": {
+                "relation": [
+                    {"id": str(DateFormat.retrieve_or_create_from_data(data.date_format).id)}
+                ]
+            },
+            "Release Region": {
+                "relation": [
+                    {
+                        "id": str(
+                            ReleaseDateRegion.retrieve_or_create_from_data(data.release_region).id
+                        )
+                    }
+                ]
+            },
+            "D": {"number": data.d},
+            "Name": {
+                "title": [{"text": {"content": f"{data.platform.name} - {data.y}/{data.m}"}}]
+            },
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                # (f"game.{f}" for f in Game.get_query_fields()),
+                (f"platform.{f}" for f in Platform.get_query_fields()),
+                (f"status.{f}" for f in ReleaseDateStatus.get_query_fields()),
+                (f"date_format.{f}" for f in DateFormat.get_query_fields()),
+                (f"release_region.{f}" for f in ReleaseDateRegion.get_query_fields()),
+            )
+        )
+
+
+class Screenshot(IGDBNotionPage[igdb_proto.Screenshot]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
+            "Animated": {"type": "checkbox", "checkbox": {}},
+            # "Game": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Height": {"type": "number", "number": {"format": "number"}},
+            "Image ID": {"type": "rich_text", "rich_text": {}},
+            "URL": {"type": "url", "url": {}},
+            "Width": {"type": "number", "number": {"format": "number"}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Screenshot) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Alpha Channel": {"checkbox": data.alpha_channel},
+            "Animated": {"checkbox": data.animated},
+            "Height": {"number": data.height},
+            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
+            "URL": {"url": data.url or None},
+            "Width": {"number": data.width},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.Screenshot,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.url:
+            icon_url = add_https_scheme(data.url)
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("t_thumb", "t_1080p")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+
+
+class Theme(IGDBNotionPage[igdb_proto.Theme]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Created At": {"type": "date", "date": {}},
+            "Name": {"type": "title", "title": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Theme) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class Website(IGDBNotionPage[igdb_proto.Website]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(WebsiteType._notional__database)
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Category": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name.removeprefix("WEBSITE_")}
+                        for name in igdb_proto.WebsiteCategoryEnum.__members__
+                        if name != "WEBSITE_CATEGORY_NULL"
+                    ]
+                },
+            },
+            # "Game": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Trusted": {"type": "checkbox", "checkbox": {}},
+            "URL": {"type": "url", "url": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(website_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Website) -> dict[str, dict[str, Any]]:
+        category = (
+            data.category.name.removeprefix("WEBSITE_")
+            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
+            else None
+        )
+
+        return {
+            "ID": {"number": data.id},
+            "Category": {
+                "type": "select",
+                "select": {"name": category} if category else None,
+            },
+            "Trusted": {"checkbox": data.trusted},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Type": {
+                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
+            },
+            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"type.{f}" for f in WebsiteType.get_query_fields()),
+            )
+        )
 
 
 class Game(IGDBNotionPage[igdb_proto.Game]):
@@ -3019,120 +3965,7 @@ class Game(IGDBNotionPage[igdb_proto.Game]):
         return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
-class GameEngine(IGDBNotionPage[igdb_proto.GameEngine]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Company._notional__database,
-            GameEngineLogo._notional__database,
-            Platform._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        company_db_id: str | UUID, game_engine_logo_db_id: str | UUID, platform_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Companies": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_engine_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            "Platforms": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.GameEngine) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Companies": {
-                "relation": [
-                    {"id": str(Company.retrieve_or_create_from_data(comp).id)}
-                    for comp in data.companies
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Logo": {
-                "relation": [
-                    {"id": str(GameEngineLogo.retrieve_or_create_from_data(data.logo).id)}
-                ]
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Platforms": {
-                "relation": [
-                    {"id": str(Platform.retrieve_or_create_from_data(platf).id)}
-                    for platf in data.platforms
-                ]
-            },
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"companies.{f}" for f in Company.get_query_fields()),
-                (f"logo.{f}" for f in GameEngineLogo.get_query_fields()),
-                (f"platforms.{f}" for f in Platform.get_query_fields()),
-            )
-        )
-
-    @override
-    @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.GameEngine,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.logo.url:
-            icon_url = add_https_scheme(data.logo.url)
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
-
-
-class GameEngineLogo(IGDBNotionPage[igdb_proto.GameEngineLogo]):
+class CollectionType(IGDBNotionPage[igdb_proto.CollectionType]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
@@ -3143,108 +3976,368 @@ class GameEngineLogo(IGDBNotionPage[igdb_proto.GameEngineLogo]):
     def _get_notion_schema() -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},
+            "Description": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.CollectionType) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Description": {
+                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
+            },
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class Collection(IGDBNotionPage[igdb_proto.Collection]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            Game._notional__database,
+            CollectionType._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        game_db_id: str | UUID, collection_type_db_id: str | UUID
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Created At": {"type": "date", "date": {}},
+            "Games": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(game_db_id),
+                    "type": "single_property",
+                    "single_property": {},
+                },
+            },
+            "Name": {"type": "title", "title": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
             "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(collection_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            # "As Parent Relations": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(collection_relation_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            # "As Child Relations": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(collection_relation_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Collection) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Games": {
+                "relation": [
+                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
+                ]
+            },
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Type": {
+                "relation": [
+                    {"id": str(CollectionType.retrieve_or_create_from_data(data.type).id)}
+                ]
+            },
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"games.{f}" for f in Game.get_query_fields()),
+                (f"type.{f}" for f in CollectionType.get_query_fields()),
+                # (
+                #     f"as_parent_relations.{f}"
+                #     for f in CollectionRelation.get_query_fields()
+                # ),
+                # (
+                #     f"as_child_relations.{f}"
+                #     for f in CollectionRelation.get_query_fields()
+                # ),
+            )
+        )
+
+
+class CollectionMembershipType(IGDBNotionPage[igdb_proto.CollectionMembershipType]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            CollectionType._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        collection_type_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Description": {"type": "rich_text", "rich_text": {}},
+            "Allowed Collection Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(collection_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Updated At": {"type": "date", "date": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(
+        data: igdb_proto.CollectionMembershipType,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Description": {
+                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
+            },
+            "Allowed Collection Type": {
+                "relation": [
+                    {
+                        "id": str(
+                            CollectionType.retrieve_or_create_from_data(
+                                data.allowed_collection_type
+                            ).id
+                        )
+                    }
+                ]
+            },
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"allowed_collection_type.{f}" for f in CollectionType.get_query_fields()),
+            )
+        )
+
+
+class CollectionMembership(IGDBNotionPage[igdb_proto.CollectionMembership]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            Game._notional__database,
+            Collection._notional__database,
+            CollectionMembershipType._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        game_db_id: str | UUID,
+        collection_db_id: str | UUID,
+        collection_membership_type_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Game": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(game_db_id),
+                    "type": "single_property",
+                    "single_property": {},
+                },
+            },
+            "Collection": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(collection_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(collection_membership_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Updated At": {"type": "date", "date": {}},
+            "Created At": {"type": "date", "date": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
             "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.GameEngineLogo) -> dict[str, dict[str, Any]]:
+    @classmethod
+    def get_notion_properties(
+        cls, data: igdb_proto.CollectionMembership
+    ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
+            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
+            "Collection": {
+                "relation": [
+                    {"id": str(Collection.retrieve_or_create_from_data(data.collection).id)}
+                ]
+            },
+            "Type": {
+                "relation": [
+                    {
+                        "id": str(
+                            CollectionMembershipType.retrieve_or_create_from_data(data.type).id
+                        )
+                    }
+                ]
+            },
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Name": {
+                "title": [
+                    {
+                        "text": {
+                            "content": f"{data.game.name} - {data.collection.name}"
+                            f" - {data.type.name}"
+                        }
+                    }
+                ]
+            },
         }
 
     @override
     @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.GameEngineLogo,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.url:
-            icon_url = add_https_scheme(data.url)
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"game.{f}" for f in Game.get_query_fields()),
+                (f"collection.{f}" for f in Collection.get_query_fields()),
+                (f"type.{f}" for f in CollectionMembershipType.get_query_fields()),
+            )
+        )
 
 
-class GameLocalization(IGDBNotionPage[igdb_proto.GameLocalization]):
+class CollectionRelationType(IGDBNotionPage[igdb_proto.CollectionRelationType]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
         return cls._get_notion_schema(
-            Cover._notional__database,
-            Region._notional__database,
+            CollectionType._notional__database,
         )
 
     @staticmethod
     @functools.cache
     def _get_notion_schema(
-        cover_db_id: str | UUID, region_db_id: str | UUID
+        collection_type_db_id: str | UUID,
     ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
             "Name": {"type": "title", "title": {}},
-            "Cover": {
+            "Description": {"type": "rich_text", "rich_text": {}},
+            "Allowed Child Type": {
                 "type": "relation",
                 "relation": {
-                    "database_id": str(cover_db_id),
+                    "database_id": str(collection_type_db_id),
                     "type": "dual_property",
                     "dual_property": {},
                 },
             },
-            "Region": {
+            "Allowed Parent Type": {
                 "type": "relation",
                 "relation": {
-                    "database_id": str(region_db_id),
+                    "database_id": str(collection_type_db_id),
                     "type": "dual_property",
                     "dual_property": {},
                 },
             },
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Created At": {"type": "date", "date": {}},
             "Updated At": {"type": "date", "date": {}},
+            "Created At": {"type": "date", "date": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameLocalization) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(
+        data: igdb_proto.CollectionRelationType,
+    ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
             "Name": {"title": [{"text": {"content": data.name}}]},
-            "Cover": {
-                "relation": [{"id": str(Cover.retrieve_or_create_from_data(data.cover).id)}]
+            "Description": {
+                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
             },
-            "Region": {
-                "relation": [{"id": str(Region.retrieve_or_create_from_data(data.region).id)}]
+            "Allowed Child Type": {
+                "relation": [
+                    {
+                        "id": str(
+                            CollectionType.retrieve_or_create_from_data(data.allowed_child_type).id
+                        )
+                    }
+                ]
             },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Allowed Parent Type": {
+                "relation": [
+                    {
+                        "id": str(
+                            CollectionType.retrieve_or_create_from_data(
+                                data.allowed_parent_type
+                            ).id
+                        )
+                    }
+                ]
+            },
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
         }
 
@@ -3255,118 +4348,107 @@ class GameLocalization(IGDBNotionPage[igdb_proto.GameLocalization]):
         return tuple(
             itertools.chain(
                 super().get_query_fields(),
-                # (f"game.{f}" for f in Game.get_query_fields()),
-                (f"cover.{f}" for f in Cover.get_query_fields()),
-                (f"region.{f}" for f in Region.get_query_fields()),
+                (f"allowed_child_type.{f}" for f in CollectionType.get_query_fields()),
+                (f"allowed_parent_type.{f}" for f in CollectionType.get_query_fields()),
             )
         )
 
-    @override
-    @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.GameLocalization,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.cover.url:
-            icon_url = add_https_scheme(data.cover.url)
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
-
-
-class GameMode(IGDBNotionPage[igdb_proto.GameMode]):
+class CollectionRelation(IGDBNotionPage[igdb_proto.CollectionRelation]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+        return cls._get_notion_schema(
+            Collection._notional__database,
+            CollectionRelationType._notional__database,
+        )
 
     @staticmethod
     @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+    def _get_notion_schema(
+        collection_db_id: str | UUID, collection_relation_type_db_id: str | UUID
+    ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Child Collection": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(collection_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Parent Collection": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(collection_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(collection_relation_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
             "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
+            "Created At": {"type": "date", "date": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.GameMode) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class GameReleaseFormat(IGDBNotionPage[igdb_proto.GameReleaseFormat]):
     @override
     @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Format": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.GameReleaseFormat) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(
+        cls, data: igdb_proto.CollectionRelation
+    ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Format": {"title": [{"text": {"content": data.format}}]},
+            "Child Collection": {
+                "relation": [
+                    {"id": str(Collection.retrieve_or_create_from_data(data.child_collection).id)}
+                ]
+            },
+            "Parent Collection": {
+                "relation": [
+                    {"id": str(Collection.retrieve_or_create_from_data(data.parent_collection).id)}
+                ]
+            },
+            "Type": {
+                "relation": [
+                    {"id": str(CollectionRelationType.retrieve_or_create_from_data(data.type).id)}
+                ]
+            },
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {
+                "title": [
+                    {
+                        "text": {
+                            "content": f"{data.parent_collection.name}"
+                            f" - {data.child_collection.name} - {data.type.name}"
+                        }
+                    }
+                ]
+            },
         }
 
-
-class GameStatus(IGDBNotionPage[igdb_proto.GameStatus]):
     @override
     @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
     @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Status": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.GameStatus) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Status": {"title": [{"text": {"content": data.status}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"child_collection.{f}" for f in Collection.get_query_fields()),
+                (f"parent_collection.{f}" for f in Collection.get_query_fields()),
+                (f"type.{f}" for f in CollectionRelationType.get_query_fields()),
+            )
+        )
 
 
 class GameTimeToBeat(IGDBNotionPage[igdb_proto.GameTimeToBeat]):
@@ -3408,33 +4490,150 @@ class GameTimeToBeat(IGDBNotionPage[igdb_proto.GameTimeToBeat]):
         }
 
 
-class GameType(IGDBNotionPage[igdb_proto.GameType]):
+class GameVersionFeatureValue(IGDBNotionPage[igdb_proto.GameVersionFeatureValue]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+        return cls._get_notion_schema(Game._notional__database)
 
     @staticmethod
     @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+    def _get_notion_schema(game_db_id: str | UUID) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Type": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
+            "Game": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(game_db_id),
+                    "type": "single_property",
+                    "single_property": {},
+                },
+            },
+            # "Game Feature": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(game_version_feature_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Included Feature": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": nm}
+                        for nm in igdb_proto.GameVersionFeatureValueIncludedFeatureEnum.__members__
+                    ]
+                },
+            },
+            "Note": {"type": "rich_text", "rich_text": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(
+        data: igdb_proto.GameVersionFeatureValue,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
+            "Included Feature": {
+                "type": "select",
+                "select": {"name": data.included_feature.name},
+            },
+            "Note": {"rich_text": [{"text": {"content": data.note[:MAX_TEXT_LENGTH]}}]},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {
+                "title": [
+                    {"text": {"content": f"{data.game.name} - {data.included_feature.name}"}}
+                ]
+            },
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"game.{f}" for f in Game.get_query_fields()),
+            )
+        )
+
+
+class GameVersionFeature(IGDBNotionPage[igdb_proto.GameVersionFeature]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            GameVersionFeatureValue._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        game_version_feature_value_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Category": {
+                "type": "select",
+                "select": {
+                    "options": [
+                        {"name": name}
+                        for name in igdb_proto.GameVersionFeatureCategoryEnum.__members__
+                    ]
+                },
+            },
+            "Description": {"type": "rich_text", "rich_text": {}},
+            "Position": {"type": "number", "number": {"format": "number"}},
+            "Title": {"type": "title", "title": {}},
+            "Values": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(game_version_feature_value_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
             "Checksum": {"type": "rich_text", "rich_text": {}},
         }
 
     @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.GameType) -> dict[str, dict[str, Any]]:
+    @classmethod
+    def get_notion_properties(
+        cls, data: igdb_proto.GameVersionFeature
+    ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Type": {"title": [{"text": {"content": data.type}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Category": {"type": "select", "select": {"name": data.category.name}},
+            "Description": {
+                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
+            },
+            "Position": {"number": data.position},
+            "Title": {"title": [{"text": {"content": data.title}}]},
+            "Values": {
+                "relation": [
+                    {"id": str(GameVersionFeatureValue.retrieve_or_create_from_data(value).id)}
+                    for value in data.values
+                ]
+            },
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
         }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"values.{f}" for f in GameVersionFeatureValue.get_query_fields()),
+            )
+        )
 
 
 class GameVersion(IGDBNotionPage[igdb_proto.GameVersion]):
@@ -3522,90 +4721,143 @@ class GameVersion(IGDBNotionPage[igdb_proto.GameVersion]):
         )
 
 
-class GameVersionFeature(IGDBNotionPage[igdb_proto.GameVersionFeature]):
+class CharacterGender(IGDBNotionPage[igdb_proto.CharacterGender]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.CharacterGender) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
+            "Animated": {"type": "checkbox", "checkbox": {}},
+            "Height": {"type": "number", "number": {"format": "number"}},
+            "Image ID": {"type": "rich_text", "rich_text": {}},
+            "URL": {"type": "url", "url": {}},
+            "Width": {"type": "number", "number": {"format": "number"}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.CharacterMugShot) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Alpha Channel": {"checkbox": data.alpha_channel},
+            "Animated": {"checkbox": data.animated},
+            "Height": {"number": data.height},
+            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
+            "URL": {"url": data.url or None},
+            "Width": {"number": data.width},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.CharacterMugShot,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.url:
+            icon_url = add_https_scheme(data.url)
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+
+
+class CharacterSpecie(IGDBNotionPage[igdb_proto.CharacterSpecie]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema()
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema() -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.CharacterSpecie) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+
+class Character(IGDBNotionPage[igdb_proto.Character]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
         return cls._get_notion_schema(
-            GameVersionFeatureValue._notional__database,
+            Game._notional__database,
+            CharacterMugShot._notional__database,
+            CharacterGender._notional__database,
+            CharacterSpecie._notional__database,
         )
 
     @staticmethod
     @functools.cache
     def _get_notion_schema(
-        game_version_feature_value_db_id: str | UUID,
+        game_db_id: str | UUID,
+        character_mug_shot_db_id: str | UUID,
+        character_gender_db_id: str | UUID,
+        character_specie_db_id: str | UUID,
     ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.GameVersionFeatureCategoryEnum.__members__
-                    ]
-                },
-            },
+            "AKAs": {"type": "multi_select", "multi_select": {}},
+            "Country Name": {"type": "rich_text", "rich_text": {}},
+            "Created At": {"type": "date", "date": {}},
             "Description": {"type": "rich_text", "rich_text": {}},
-            "Position": {"type": "number", "number": {"format": "number"}},
-            "Title": {"type": "title", "title": {}},
-            "Values": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_version_feature_value_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @classmethod
-    def get_notion_properties(
-        cls, data: igdb_proto.GameVersionFeature
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Category": {"type": "select", "select": {"name": data.category.name}},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Position": {"number": data.position},
-            "Title": {"title": [{"text": {"content": data.title}}]},
-            "Values": {
-                "relation": [
-                    {"id": str(GameVersionFeatureValue.retrieve_or_create_from_data(value).id)}
-                    for value in data.values
-                ]
-            },
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"values.{f}" for f in GameVersionFeatureValue.get_query_fields()),
-            )
-        )
-
-
-class GameVersionFeatureValue(IGDBNotionPage[igdb_proto.GameVersionFeatureValue]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Game._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(game_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Game": {
+            "Games": {
                 "type": "relation",
                 "relation": {
                     "database_id": str(game_db_id),
@@ -3613,45 +4865,104 @@ class GameVersionFeatureValue(IGDBNotionPage[igdb_proto.GameVersionFeatureValue]
                     "single_property": {},
                 },
             },
-            # "Game Feature": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_version_feature_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Included Feature": {
+            "Gender": {
+                "type": "select",
+                "select": {
+                    "options": [{"name": name} for name in igdb_proto.GenderGenderEnum.__members__]
+                },
+            },
+            "Mug Shot": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(character_mug_shot_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Name": {"type": "title", "title": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Species": {
                 "type": "select",
                 "select": {
                     "options": [
-                        {"name": nm}
-                        for nm in igdb_proto.GameVersionFeatureValueIncludedFeatureEnum.__members__
+                        {"name": name}
+                        for name in igdb_proto.CharacterSpeciesEnum.__members__
+                        if name != "CHARACTER_SPECIES_NULL"
                     ]
                 },
             },
-            "Note": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "URL": {"type": "url", "url": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
+            "Character Gender": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(character_gender_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Character Species": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(character_specie_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
         }
 
     @override
     @staticmethod
-    def get_notion_properties(
-        data: igdb_proto.GameVersionFeatureValue,
-    ) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.Character) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
-            "Included Feature": {
-                "type": "select",
-                "select": {"name": data.included_feature.name},
+            "AKAs": {"multi_select": [{"name": aka} for aka in data.akas]},
+            "Country Name": {"rich_text": [{"text": {"content": data.country_name}}]},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Description": {
+                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
             },
-            "Note": {"rich_text": [{"text": {"content": data.note[:MAX_TEXT_LENGTH]}}]},
+            "Games": {
+                "relation": [
+                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
+                ]
+            },
+            "Gender": {"type": "select", "select": {"name": data.gender.name}},
+            "Mug Shot": {
+                "relation": [
+                    {"id": str(CharacterMugShot.retrieve_or_create_from_data(data.mug_shot).id)}
+                ]
+            },
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Species": {
+                "type": "select",
+                "select": (
+                    {"name": data.species.name}
+                    if data.species.name != "CHARACTER_SPECIES_NULL"
+                    else None
+                ),
+            },
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "URL": {"url": data.url or None},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {
-                "title": [
-                    {"text": {"content": f"{data.game.name} - {data.included_feature.name}"}}
+            "Character Gender": {
+                "relation": [
+                    {
+                        "id": str(
+                            CharacterGender.retrieve_or_create_from_data(data.character_gender).id
+                        )
+                    }
+                ]
+            },
+            "Character Species": {
+                "relation": [
+                    {
+                        "id": str(
+                            CharacterSpecie.retrieve_or_create_from_data(data.character_species).id
+                        )
+                    }
                 ]
             },
         }
@@ -3663,142 +4974,10 @@ class GameVersionFeatureValue(IGDBNotionPage[igdb_proto.GameVersionFeatureValue]
         return tuple(
             itertools.chain(
                 super().get_query_fields(),
-                (f"game.{f}" for f in Game.get_query_fields()),
-            )
-        )
-
-
-class GameVideo(IGDBNotionPage[igdb_proto.GameVideo]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Name": {"type": "title", "title": {}},
-            "Video ID": {"type": "rich_text", "rich_text": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.GameVideo) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Video ID": {"rich_text": [{"text": {"content": data.video_id}}]},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class Genre(IGDBNotionPage[igdb_proto.Genre]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.Genre) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class InvolvedCompany(IGDBNotionPage[igdb_proto.InvolvedCompany]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Company._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(company_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Company": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Developer": {"type": "checkbox", "checkbox": {}},
-            "Porting": {"type": "checkbox", "checkbox": {}},
-            "Publisher": {"type": "checkbox", "checkbox": {}},
-            "Supporting": {"type": "checkbox", "checkbox": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.InvolvedCompany) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Company": {
-                "relation": [{"id": str(Company.retrieve_or_create_from_data(data.company).id)}]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Developer": {"checkbox": data.developer},
-            "Porting": {"checkbox": data.porting},
-            "Publisher": {"checkbox": data.publisher},
-            "Supporting": {"checkbox": data.supporting},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": data.company.name}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"company.{f}" for f in Company.get_query_fields()),
+                (f"games.{f}" for f in Game.get_query_fields()),
+                (f"mug_shot.{f}" for f in CharacterMugShot.get_query_fields()),
+                (f"character_gender.{f}" for f in CharacterGender.get_query_fields()),
+                (f"character_species.{f}" for f in CharacterSpecie.get_query_fields()),
             )
         )
 
@@ -3807,19 +4986,19 @@ class InvolvedCompany(IGDBNotionPage[igdb_proto.InvolvedCompany]):
     @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
     def retrieve_or_create_from_data(
         cls,
-        data: igdb_proto.InvolvedCompany,
+        data: igdb_proto.Character,
         icon_url: str | None = None,
         cover_url: str | None = None,
     ) -> Self:
-        if not icon_url and data.company.logo.url:
-            icon_url = add_https_scheme(data.company.logo.url).replace("t_thumb", "t_logo_med")
+        if not icon_url and data.mug_shot.url:
+            icon_url = add_https_scheme(data.mug_shot.url)
         if not cover_url and icon_url:
-            cover_url = icon_url.replace("t_thumb", "t_logo_med")
+            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
         return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
-class Keyword(IGDBNotionPage[igdb_proto.Keyword]):
+class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
@@ -3830,261 +5009,58 @@ class Keyword(IGDBNotionPage[igdb_proto.Keyword]):
     def _get_notion_schema() -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
+            # "Event": {
+            #     "type": "relation",
+            #     "relation": {
+            #         "database_id": str(event_db_id),
+            #         "type": "single_property",
+            #         "single_property": {},
+            #     },
+            # },
+            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
+            "Animated": {"type": "checkbox", "checkbox": {}},
+            "Height": {"type": "number", "number": {"format": "number"}},
+            "Image ID": {"type": "rich_text", "rich_text": {}},
             "URL": {"type": "url", "url": {}},
+            "Width": {"type": "number", "number": {"format": "number"}},
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Keyword) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.EventLogo) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Alpha Channel": {"checkbox": data.alpha_channel},
+            "Animated": {"checkbox": data.animated},
+            "Height": {"number": data.height},
+            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
             "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class Language(IGDBNotionPage[igdb_proto.Language]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Native Name": {"type": "rich_text", "rich_text": {}},
-            "Locale": {"type": "rich_text", "rich_text": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.Language) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Native Name": {"rich_text": [{"text": {"content": data.native_name}}]},
-            "Locale": {"rich_text": [{"text": {"content": data.locale}}]},
+            "Width": {"number": data.width},
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class LanguageSupport(IGDBNotionPage[igdb_proto.LanguageSupport]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Language._notional__database,
-            LanguageSupportType._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        language_db_id: str | UUID, language_support_type_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Language": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(language_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Language Support Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(language_support_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.LanguageSupport) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Language": {
-                "relation": [{"id": str(Language.retrieve_or_create_from_data(data.language).id)}]
-            },
-            "Language Support Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            LanguageSupportType.retrieve_or_create_from_data(
-                                data.language_support_type
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {
-                "title": [
-                    {
-                        "text": {
-                            "content": f"{data.language.name} - {data.language_support_type.name}"
-                        }
-                    }
-                ]
-            },
+            "Name": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
     @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                # (f"game.{f}" for f in Game.get_query_fields()),
-                (f"language.{f}" for f in Language.get_query_fields()),
-                (f"language_support_type.{f}" for f in LanguageSupportType.get_query_fields()),
-            )
-        )
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.EventLogo,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.url:
+            icon_url = add_https_scheme(data.url)
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("/t_thumb/", "/t_original/")
 
-
-class LanguageSupportType(IGDBNotionPage[igdb_proto.LanguageSupportType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @classmethod
-    def get_notion_properties(
-        cls, data: igdb_proto.LanguageSupportType
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class MultiplayerMode(IGDBNotionPage[igdb_proto.MultiplayerMode]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Platform._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(platform_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Campaign Coop": {"type": "checkbox", "checkbox": {}},
-            "Drop In": {"type": "checkbox", "checkbox": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "LAN Coop": {"type": "checkbox", "checkbox": {}},
-            "Offline Coop": {"type": "checkbox", "checkbox": {}},
-            "Offline Coop Max": {"type": "number", "number": {"format": "number"}},
-            "Offline Max": {"type": "number", "number": {"format": "number"}},
-            "Online Coop": {"type": "checkbox", "checkbox": {}},
-            "Online Coop Max": {"type": "number", "number": {"format": "number"}},
-            "Online Max": {"type": "number", "number": {"format": "number"}},
-            "Platform": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Split Screen": {"type": "checkbox", "checkbox": {}},
-            "Split Screen Online": {"type": "checkbox", "checkbox": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.MultiplayerMode) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Campaign Coop": {"checkbox": data.campaigncoop},
-            "Drop In": {"checkbox": data.dropin},
-            "LAN Coop": {"checkbox": data.lancoop},
-            "Offline Coop": {"checkbox": data.offlinecoop},
-            "Offline Coop Max": {"number": data.offlinecoopmax},
-            "Offline Max": {"number": data.offlinemax},
-            "Online Coop": {"checkbox": data.onlinecoop},
-            "Online Coop Max": {"number": data.onlinecoopmax},
-            "Online Max": {"number": data.onlinemax},
-            "Platform": {
-                "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
-            },
-            "Split Screen": {"checkbox": data.splitscreen},
-            "Split Screen Online": {"checkbox": data.splitscreenonline},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": f"{data.platform.name} - {data.id}"}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                # (f"game.{f}" for f in Game.get_query_fields()),
-                (f"platform.{f}" for f in Platform.get_query_fields()),
-            )
-        )
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
 
 
 class NetworkType(IGDBNotionPage[igdb_proto.NetworkType]):
@@ -4124,607 +5100,272 @@ class NetworkType(IGDBNotionPage[igdb_proto.NetworkType]):
         }
 
 
-class Platform(IGDBNotionPage[igdb_proto.Platform]):
+class EventNetwork(IGDBNotionPage[igdb_proto.EventNetwork]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            PlatformLogo._notional__database,
-            PlatformFamily._notional__database,
-            PlatformVersion._notional__database,
-            PlatformWebsite._notional__database,
-            PlatformType._notional__database,
-        )
+        return cls._get_notion_schema(NetworkType._notional__database)
 
     @staticmethod
     @functools.cache
-    def _get_notion_schema(
-        platform_logo_db_id: str | UUID,
-        platform_family_db_id: str | UUID,
-        platform_version_db_id: str | UUID,
-        platform_website_db_id: str | UUID,
-        platform_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
+    def _get_notion_schema(network_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Abbreviation": {"type": "rich_text", "rich_text": {}},
-            "Alternative Name": {"type": "rich_text", "rich_text": {}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.PlatformCategoryEnum.__members__
-                        if name != "PLATFORM_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Generation": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Platform Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Platform Family": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_family_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Summary": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Versions": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_version_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Websites": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_website_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Platform Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.Platform) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Abbreviation": {"rich_text": [{"text": {"content": data.abbreviation}}]},
-            "Alternative Name": {"rich_text": [{"text": {"content": data.alternative_name}}]},
-            "Category": {
-                "type": "select",
-                "select": (
-                    {"name": data.category.name}
-                    if data.category.name != "PLATFORM_CATEGORY_NULL"
-                    else None
-                ),
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Generation": {"number": data.generation},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Platform Logo": {
-                "relation": [
-                    {"id": str(PlatformLogo.retrieve_or_create_from_data(data.platform_logo).id)}
-                ]
-            },
-            "Platform Family": {
-                "relation": [
-                    {
-                        "id": str(
-                            PlatformFamily.retrieve_or_create_from_data(data.platform_family).id
-                        )
-                    }
-                ]
-            },
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Summary": {"rich_text": [{"text": {"content": data.summary[:MAX_TEXT_LENGTH]}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Versions": {
-                "relation": [
-                    {"id": str(PlatformVersion.retrieve_or_create_from_data(ver).id)}
-                    for ver in data.versions
-                ]
-            },
-            "Websites": {
-                "relation": [
-                    {"id": str(PlatformWebsite.retrieve_or_create_from_data(ws).id)}
-                    for ws in data.websites
-                ]
-            },
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Platform Type": {
-                "relation": [
-                    {"id": str(PlatformType.retrieve_or_create_from_data(data.platform_type).id)}
-                ]
-            },
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"platform_logo.{f}" for f in PlatformLogo.get_query_fields()),
-                (f"platform_family.{f}" for f in PlatformFamily.get_query_fields()),
-                (f"versions.{f}" for f in PlatformVersion.get_query_fields()),
-                (f"websites.{f}" for f in PlatformWebsite.get_query_fields()),
-                (f"platform_type.{f}" for f in PlatformType.get_query_fields()),
-            )
-        )
-
-    @override
-    @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.Platform,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.platform_logo.url:
-            icon_url = add_https_scheme(data.platform_logo.url).replace("t_thumb", "t_logo_med")
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("t_thumb", "t_logo_med")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
-
-
-class PlatformFamily(IGDBNotionPage[igdb_proto.PlatformFamily]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformFamily) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class PlatformLogo(IGDBNotionPage[igdb_proto.PlatformLogo]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformLogo) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.PlatformLogo,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.url:
-            icon_url = add_https_scheme(data.url).replace("t_thumb", "t_logo_med")
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("t_thumb", "t_logo_med")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
-
-
-class PlatformType(IGDBNotionPage[igdb_proto.PlatformType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformType) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class PlatformVersion(IGDBNotionPage[igdb_proto.PlatformVersion]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            PlatformVersionCompany._notional__database,
-            PlatformLogo._notional__database,
-            PlatformVersionReleaseDate._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        platform_version_company_db_id: str | UUID,
-        platform_logo_db_id: str | UUID,
-        platform_version_release_date_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Companies": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_version_company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Connectivity": {"type": "rich_text", "rich_text": {}},
-            "CPU": {"type": "rich_text", "rich_text": {}},
-            "Graphics": {"type": "rich_text", "rich_text": {}},
-            "Main Manufacturer": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_version_company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Media": {"type": "rich_text", "rich_text": {}},
-            "Memory": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},
-            "OS": {"type": "rich_text", "rich_text": {}},
-            "Output": {"type": "rich_text", "rich_text": {}},
-            "Platform Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Release Dates": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_version_release_date_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Resolutions": {"type": "rich_text", "rich_text": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Sound": {"type": "rich_text", "rich_text": {}},
-            "Storage": {"type": "rich_text", "rich_text": {}},
-            "Summary": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformVersion) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Companies": {
-                "relation": [
-                    {"id": str(PlatformVersionCompany.retrieve_or_create_from_data(company).id)}
-                    for company in data.companies
-                ]
-            },
-            "Connectivity": {"rich_text": [{"text": {"content": data.connectivity}}]},
-            "CPU": {"rich_text": [{"text": {"content": data.cpu}}]},
-            "Graphics": {"rich_text": [{"text": {"content": data.graphics}}]},
-            "Main Manufacturer": {
-                "relation": [
-                    {
-                        "id": str(
-                            PlatformVersionCompany.retrieve_or_create_from_data(
-                                data.main_manufacturer
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Media": {"rich_text": [{"text": {"content": data.media}}]},
-            "Memory": {"rich_text": [{"text": {"content": data.memory}}]},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "OS": {"rich_text": [{"text": {"content": data.os}}]},
-            "Output": {"rich_text": [{"text": {"content": data.output}}]},
-            "Platform Logo": {
-                "relation": [
-                    {"id": str(PlatformLogo.retrieve_or_create_from_data(data.platform_logo).id)}
-                ]
-            },
-            "Release Dates": {
-                "relation": [
-                    {
-                        "id": str(
-                            PlatformVersionReleaseDate.retrieve_or_create_from_data(
-                                release_date
-                            ).id
-                        )
-                    }
-                    for release_date in data.platform_version_release_dates
-                ]
-            },
-            "Resolutions": {"rich_text": [{"text": {"content": data.resolutions}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Sound": {"rich_text": [{"text": {"content": data.sound}}]},
-            "Storage": {"rich_text": [{"text": {"content": data.storage}}]},
-            "Summary": {"rich_text": [{"text": {"content": data.summary[:MAX_TEXT_LENGTH]}}]},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"companies.{f}" for f in PlatformVersionCompany.get_query_fields()),
-                (f"main_manufacturer.{f}" for f in PlatformVersionCompany.get_query_fields()),
-                (f"platform_logo.{f}" for f in PlatformLogo.get_query_fields()),
-                (
-                    f"platform_version_release_dates.{f}"
-                    for f in PlatformVersionReleaseDate.get_query_fields()
-                ),
-            )
-        )
-
-    @override
-    @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.PlatformVersion,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.platform_logo.url:
-            icon_url = add_https_scheme(data.platform_logo.url).replace("t_thumb", "t_logo_med")
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("t_thumb", "t_logo_med")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
-
-
-class PlatformVersionCompany(IGDBNotionPage[igdb_proto.PlatformVersionCompany]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Company._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(company_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Comment": {"type": "rich_text", "rich_text": {}},
-            "Company": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Developer": {"type": "checkbox", "checkbox": {}},
-            "Manufacturer": {"type": "checkbox", "checkbox": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(
-        data: igdb_proto.PlatformVersionCompany,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Comment": {"rich_text": [{"text": {"content": data.comment[:MAX_TEXT_LENGTH]}}]},
-            "Company": {
-                "relation": [{"id": str(Company.retrieve_or_create_from_data(data.company).id)}]
-            },
-            "Developer": {"checkbox": data.developer},
-            "Manufacturer": {"checkbox": data.manufacturer},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": f"{data.company.name} - {data.id}"}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"company.{f}" for f in Company.get_query_fields()),
-            )
-        )
-
-
-class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleaseDate]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            DateFormat._notional__database, ReleaseDateRegion._notional__database
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        date_format_db_id: str | UUID, release_date_region_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.DateFormatChangeDateCategoryEnum.__members__
-                    ]
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Date": {"type": "date", "date": {}},
-            "Human": {"type": "rich_text", "rich_text": {}},
-            "M": {"type": "number", "number": {"format": "number"}},
-            # "Platform Version": {
+            # "Event": {
             #     "type": "relation",
             #     "relation": {
-            #         "database_id": str(platform_version_db_id),
+            #         "database_id": str(event_db_id),
             #         "type": "single_property",
             #         "single_property": {},
             #     },
             # },
-            "Region": {
+            "URL": {"type": "url", "url": {}},
+            "Network Type": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(network_type_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+            "Name": {"type": "title", "title": {}},  # This is a required property
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.EventNetwork) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "URL": {"url": data.url or None},
+            "Network Type": {
+                "relation": [
+                    {"id": str(NetworkType.retrieve_or_create_from_data(data.network_type).id)}
+                ]
+            },
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "Name": {"title": [{"text": {"content": f"{data.network_type.name} - {data.id}"}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                # (f"event.{f}" for f in Event.get_query_fields()),
+                (f"network_type.{f}" for f in NetworkType.get_query_fields()),
+            )
+        )
+
+
+class Event(IGDBNotionPage[igdb_proto.Event]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(
+            EventLogo._notional__database,
+            Game._notional__database,
+            GameVideo._notional__database,
+            EventNetwork._notional__database,
+        )
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        event_logo_db_id: str | UUID,
+        game_db_id: str | UUID,
+        game_video_db_id: str | UUID,
+        event_network_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Name": {"type": "title", "title": {}},
+            "Description": {"type": "rich_text", "rich_text": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "Event Logo": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(event_logo_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Start Time": {"type": "date", "date": {}},
+            "Time Zone": {"type": "rich_text", "rich_text": {}},
+            "End Time": {"type": "date", "date": {}},
+            "Live Stream URL": {"type": "url", "url": {}},
+            "Games": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(game_db_id),
+                    "type": "single_property",
+                    "single_property": {},
+                },
+            },
+            "Videos": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(game_video_db_id),
+                    "type": "single_property",
+                    "single_property": {},
+                },
+            },
+            "Event Networks": {
+                "type": "relation",
+                "relation": {
+                    "database_id": str(event_network_db_id),
+                    "type": "dual_property",
+                    "dual_property": {},
+                },
+            },
+            "Created At": {"type": "date", "date": {}},
+            "Updated At": {"type": "date", "date": {}},
+            "Checksum": {"type": "rich_text", "rich_text": {}},
+        }
+
+    @override
+    @staticmethod
+    def get_notion_properties(data: igdb_proto.Event) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"number": data.id},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Description": {
+                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
+            },
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "Event Logo": {
+                "relation": [
+                    {"id": str(EventLogo.retrieve_or_create_from_data(data.event_logo).id)}
+                ]
+            },
+            "Start Time": {"type": "date", "date": {"start": data.start_time.isoformat()}},
+            "Time Zone": {"rich_text": [{"text": {"content": data.time_zone}}]},
+            "End Time": {"type": "date", "date": {"start": data.end_time.isoformat()}},
+            "Live Stream URL": {"url": data.live_stream_url},
+            "Games": {
+                "relation": [
+                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
+                ]
+            },
+            "Videos": {
+                "relation": [
+                    {"id": str(GameVideo.retrieve_or_create_from_data(vid).id)}
+                    for vid in data.videos
+                ]
+            },
+            "Event Networks": {
+                "relation": [
+                    {"id": str(EventNetwork.retrieve_or_create_from_data(n).id)}
+                    for n in data.event_networks
+                ]
+            },
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
+            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+        }
+
+    @override
+    @classmethod
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"event_logo.{f}" for f in EventLogo.get_query_fields()),
+                (f"games.{f}" for f in Game.get_query_fields()),
+                (f"videos.{f}" for f in GameVideo.get_query_fields()),
+                (f"event_networks.{f}" for f in EventNetwork.get_query_fields()),
+            )
+        )
+
+    @override
+    @classmethod
+    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
+    def retrieve_or_create_from_data(
+        cls,
+        data: igdb_proto.Event,
+        icon_url: str | None = None,
+        cover_url: str | None = None,
+    ) -> Self:
+        if not icon_url and data.event_logo.url:
+            icon_url = add_https_scheme(data.event_logo.url)
+        if not cover_url and icon_url:
+            cover_url = icon_url.replace("/t_thumb/", "/t_original/")
+
+        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+
+
+class PopularityType(IGDBNotionPage[igdb_proto.PopularityType]):
+    @override
+    @classmethod
+    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
+        return cls._get_notion_schema(ExternalGameSource._notional__database)
+
+    @staticmethod
+    @functools.cache
+    def _get_notion_schema(
+        external_game_source_db_id: str | UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return {
+            "ID": {"type": "number", "number": {"format": "number"}},
+            "Popularity Source": {
                 "type": "select",
                 "select": {
                     "options": [
                         {"name": name}
-                        for name in igdb_proto.RegionRegionEnum.__members__
-                        if name != "REGION_REGION_NULL"
+                        for name in igdb_proto.PopularitySourcePopularitySourceEnum.__members__
+                        if name != "POPULARITYSOURCE_POPULARITY_SOURCE_NULL"
                     ]
                 },
             },
+            "Name": {"type": "title", "title": {}},
+            "Created At": {"type": "date", "date": {}},
             "Updated At": {"type": "date", "date": {}},
-            "Y": {"type": "number", "number": {"format": "number"}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Date Format": {
+            "External Popularity Source": {
                 "type": "relation",
                 "relation": {
-                    "database_id": str(date_format_db_id),
+                    "database_id": str(external_game_source_db_id),
                     "type": "dual_property",
                     "dual_property": {},
                 },
             },
-            "Release Region": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(release_date_region_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
-    @staticmethod
-    def get_notion_properties(
-        data: igdb_proto.PlatformVersionReleaseDate,
-    ) -> dict[str, dict[str, Any]]:
+    @classmethod
+    def get_notion_properties(cls, data: igdb_proto.PopularityType) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Category": {"type": "select", "select": {"name": data.category.name}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Date": {"type": "date", "date": {"start": data.date.isoformat()}},
-            "Human": {"rich_text": [{"text": {"content": data.human}}]},
-            "M": {"number": data.m},
-            "Region": {
+            "Popularity Source": {
                 "type": "select",
                 "select": (
-                    {"name": data.region.name}
-                    if data.region.name != "REGION_REGION_NULL"
+                    {"name": data.popularity_source.name}
+                    if data.popularity_source.name != "POPULARITYSOURCE_POPULARITY_SOURCE_NULL"
                     else None
                 ),
             },
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Y": {"number": data.y},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Date Format": {
-                "relation": [
-                    {"id": str(DateFormat.retrieve_or_create_from_data(data.date_format).id)}
-                ]
-            },
-            "Release Region": {
+            "External Popularity Source": {
                 "relation": [
                     {
                         "id": str(
-                            ReleaseDateRegion.retrieve_or_create_from_data(data.release_region).id
+                            ExternalGameSource.retrieve_or_create_from_data(
+                                data.external_popularity_source
+                            ).id
                         )
                     }
                 ]
             },
-            "Name": {"title": [{"text": {"content": f"{data.y}/{data.m}"}}]},
         }
 
     @override
@@ -4734,116 +5375,9 @@ class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleas
         return tuple(
             itertools.chain(
                 super().get_query_fields(),
-                (f"date_format.{f}" for f in DateFormat.get_query_fields()),
-                (f"release_region.{f}" for f in ReleaseDateRegion.get_query_fields()),
+                (f"external_popularity_source.{f}" for f in ExternalGameSource.get_query_fields()),
             )
         )
-
-
-class PlatformWebsite(IGDBNotionPage[igdb_proto.PlatformWebsite]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(WebsiteType._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name.removeprefix("WEBSITE_")}
-                        for name in igdb_proto.WebsiteCategoryEnum.__members__
-                        if name != "WEBSITE_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Trusted": {"type": "checkbox", "checkbox": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(website_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformWebsite) -> dict[str, dict[str, Any]]:
-        category = (
-            data.category.name.removeprefix("WEBSITE_")
-            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
-            else None
-        )
-
-        return {
-            "ID": {"number": data.id},
-            "Category": {
-                "type": "select",
-                "select": ({"name": category} if category else None),
-            },
-            "Trusted": {"checkbox": data.trusted},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Type": {
-                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
-            },
-            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"type.{f}" for f in WebsiteType.get_query_fields()),
-            )
-        )
-
-
-class PlayerPerspective(IGDBNotionPage[igdb_proto.PlayerPerspective]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @classmethod
-    def get_notion_properties(
-        cls, data: igdb_proto.PlayerPerspective
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
 
 
 class PopularityPrimitive(IGDBNotionPage[igdb_proto.PopularityPrimitive]):
@@ -4970,397 +5504,111 @@ class PopularityPrimitive(IGDBNotionPage[igdb_proto.PopularityPrimitive]):
         )
 
 
-class PopularityType(IGDBNotionPage[igdb_proto.PopularityType]):
+class TestDummy(IGDBNotionPage[igdb_proto.TestDummy]):
     @override
     @classmethod
     def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(ExternalGameSource._notional__database)
+        return cls._get_notion_schema(Game._notional__database)
 
     @staticmethod
     @functools.cache
-    def _get_notion_schema(
-        external_game_source_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
+    def _get_notion_schema(game_db_id: str | UUID) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"type": "number", "number": {"format": "number"}},
-            "Popularity Source": {
+            "Bool Value": {"type": "checkbox", "checkbox": {}},
+            "Created At": {"type": "date", "date": {}},
+            "Enum Test": {
                 "type": "select",
                 "select": {
                     "options": [
                         {"name": name}
-                        for name in igdb_proto.PopularitySourcePopularitySourceEnum.__members__
-                        if name != "POPULARITYSOURCE_POPULARITY_SOURCE_NULL"
+                        for name in igdb_proto.TestDummyEnumTestEnum.__members__
+                        if name != "TESTDUMMY_ENUM_TEST_NULL"
                     ]
                 },
             },
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "External Popularity Source": {
+            "Float Value": {"type": "number", "number": {"format": "number"}},
+            "Game": {
                 "type": "relation",
                 "relation": {
-                    "database_id": str(external_game_source_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
+                    "database_id": str(game_db_id),
+                    "type": "single_property",
+                    "single_property": {},
                 },
             },
-        }
-
-    @override
-    @classmethod
-    def get_notion_properties(cls, data: igdb_proto.PopularityType) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Popularity Source": {
-                "type": "select",
-                "select": (
-                    {"name": data.popularity_source.name}
-                    if data.popularity_source.name != "POPULARITYSOURCE_POPULARITY_SOURCE_NULL"
-                    else None
-                ),
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "External Popularity Source": {
-                "relation": [
-                    {
-                        "id": str(
-                            ExternalGameSource.retrieve_or_create_from_data(
-                                data.external_popularity_source
-                            ).id
-                        )
-                    }
-                ]
-            },
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"external_popularity_source.{f}" for f in ExternalGameSource.get_query_fields()),
-            )
-        )
-
-
-class Region(IGDBNotionPage[igdb_proto.Region]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
+            "Integer Array": {
+                "type": "rich_text",
+                "rich_text": {},
+            },  # Stored as a string, will need parsing
+            "Integer Value": {"type": "number", "number": {"format": "number"}},
             "Name": {"type": "title", "title": {}},
-            "Category": {"type": "rich_text", "rich_text": {}},
-            "Identifier": {"type": "rich_text", "rich_text": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.Region) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Category": {"rich_text": [{"text": {"content": data.category}}]},
-            "Identifier": {"rich_text": [{"text": {"content": data.identifier}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class ReleaseDate(IGDBNotionPage[igdb_proto.ReleaseDate]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Platform._notional__database,
-            ReleaseDateStatus._notional__database,
-            DateFormat._notional__database,
-            ReleaseDateRegion._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        platform_db_id: str | UUID,
-        release_date_status_db_id: str | UUID,
-        date_format_db_id: str | UUID,
-        release_date_region_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.DateFormatChangeDateCategoryEnum.__members__
-                    ]
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Date": {"type": "date", "date": {}},
-            # "Game": {
+            "New Integer Value": {"type": "number", "number": {"format": "number"}},
+            "Private": {"type": "checkbox", "checkbox": {}},
+            "Slug": {"type": "rich_text", "rich_text": {}},
+            "String Array": {
+                "type": "rich_text",
+                "rich_text": {},
+            },  # Stored as a string, will need parsing
+            # "Test Dummies": {
             #     "type": "relation",
             #     "relation": {
-            #         "database_id": str(game_db_id),
+            #         "database_id": str(test_dummy_db_id),
             #         "type": "single_property",
             #         "single_property": {},
             #     },
             # },
-            "Human": {"type": "rich_text", "rich_text": {}},
-            "M": {"type": "number", "number": {"format": "number"}},
-            "Platform": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Region": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.RegionRegionEnum.__members__
-                        if name != "REGION_REGION_NULL"
-                    ]
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Y": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Status": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(release_date_status_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Date Format": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(date_format_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Release Region": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(release_date_region_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "D": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.ReleaseDate) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Category": {"type": "select", "select": {"name": data.category.name}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Date": {"type": "date", "date": {"start": data.date.isoformat()}},
-            "Human": {"rich_text": [{"text": {"content": data.human}}]},
-            "M": {"number": data.m},
-            "Platform": {
-                "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
-            },
-            "Region": {
-                "type": "select",
-                "select": (
-                    {"name": data.region.name}
-                    if data.region.name != "REGION_REGION_NULL"
-                    else None
-                ),
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Y": {"number": data.y},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Status": {
-                "relation": [
-                    {"id": str(ReleaseDateStatus.retrieve_or_create_from_data(data.status).id)}
-                ]
-            },
-            "Date Format": {
-                "relation": [
-                    {"id": str(DateFormat.retrieve_or_create_from_data(data.date_format).id)}
-                ]
-            },
-            "Release Region": {
-                "relation": [
-                    {
-                        "id": str(
-                            ReleaseDateRegion.retrieve_or_create_from_data(data.release_region).id
-                        )
-                    }
-                ]
-            },
-            "D": {"number": data.d},
-            "Name": {
-                "title": [{"text": {"content": f"{data.platform.name} - {data.y}/{data.m}"}}]
-            },
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                # (f"game.{f}" for f in Game.get_query_fields()),
-                (f"platform.{f}" for f in Platform.get_query_fields()),
-                (f"status.{f}" for f in ReleaseDateStatus.get_query_fields()),
-                (f"date_format.{f}" for f in DateFormat.get_query_fields()),
-                (f"release_region.{f}" for f in ReleaseDateRegion.get_query_fields()),
-            )
-        )
-
-
-class ReleaseDateRegion(IGDBNotionPage[igdb_proto.ReleaseDateRegion]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Region": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.ReleaseDateRegion) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Region": {"title": [{"text": {"content": data.region}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class ReleaseDateStatus(IGDBNotionPage[igdb_proto.ReleaseDateStatus]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @classmethod
-    def get_notion_properties(
-        cls, data: igdb_proto.ReleaseDateStatus
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class Screenshot(IGDBNotionPage[igdb_proto.Screenshot]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            # "Game": {
+            # "Test Dummy": {
             #     "type": "relation",
             #     "relation": {
-            #         "database_id": str(game_db_id),
+            #         "database_id": str(test_dummy_db_id),
             #         "type": "single_property",
             #         "single_property": {},
             #     },
             # },
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
+            "Updated At": {"type": "date", "date": {}},
             "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
             "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
         }
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Screenshot) -> dict[str, dict[str, Any]]:
+    def get_notion_properties(data: igdb_proto.TestDummy) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
+            "Bool Value": {"checkbox": data.bool_value},
+            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
+            "Enum Test": {
+                "type": "select",
+                "select": (
+                    {"name": data.enum_test.name}
+                    if data.enum_test.name != "TESTDUMMY_ENUM_TEST_NULL"
+                    else None
+                ),
+            },
+            "Float Value": {"number": data.float_value},
+            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
+            "Integer Array": {"rich_text": [{"text": {"content": str(data.integer_array)}}]},
+            "Integer Value": {"number": data.integer_value},
+            "Name": {"title": [{"text": {"content": data.name}}]},
+            "New Integer Value": {"number": data.new_integer_value},
+            "Private": {"checkbox": data.private},
+            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
+            "String Array": {"rich_text": [{"text": {"content": str(data.string_array)}}]},
+            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
     @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: igdb_proto.Screenshot,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> Self:
-        if not icon_url and data.url:
-            icon_url = add_https_scheme(data.url)
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("t_thumb", "t_1080p")
-
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+    @functools.cache
+    def get_query_fields(cls) -> tuple[str, ...]:
+        return tuple(
+            itertools.chain(
+                super().get_query_fields(),
+                (f"game.{f}" for f in Game.get_query_fields()),
+            )
+        )
 
 
 class Search(IGDBNotionPage[igdb_proto.Search]):
@@ -5511,251 +5759,3 @@ class Search(IGDBNotionPage[igdb_proto.Search]):
                 (f"theme.{f}" for f in Theme.get_query_fields()),
             )
         )
-
-
-class TestDummy(IGDBNotionPage[igdb_proto.TestDummy]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Game._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(game_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Bool Value": {"type": "checkbox", "checkbox": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Enum Test": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.TestDummyEnumTestEnum.__members__
-                        if name != "TESTDUMMY_ENUM_TEST_NULL"
-                    ]
-                },
-            },
-            "Float Value": {"type": "number", "number": {"format": "number"}},
-            "Game": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Integer Array": {
-                "type": "rich_text",
-                "rich_text": {},
-            },  # Stored as a string, will need parsing
-            "Integer Value": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "New Integer Value": {"type": "number", "number": {"format": "number"}},
-            "Private": {"type": "checkbox", "checkbox": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "String Array": {
-                "type": "rich_text",
-                "rich_text": {},
-            },  # Stored as a string, will need parsing
-            # "Test Dummies": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(test_dummy_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            # "Test Dummy": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(test_dummy_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.TestDummy) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Bool Value": {"checkbox": data.bool_value},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Enum Test": {
-                "type": "select",
-                "select": (
-                    {"name": data.enum_test.name}
-                    if data.enum_test.name != "TESTDUMMY_ENUM_TEST_NULL"
-                    else None
-                ),
-            },
-            "Float Value": {"number": data.float_value},
-            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
-            "Integer Array": {"rich_text": [{"text": {"content": str(data.integer_array)}}]},
-            "Integer Value": {"number": data.integer_value},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "New Integer Value": {"number": data.new_integer_value},
-            "Private": {"checkbox": data.private},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "String Array": {"rich_text": [{"text": {"content": str(data.string_array)}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"game.{f}" for f in Game.get_query_fields()),
-            )
-        )
-
-
-class Theme(IGDBNotionPage[igdb_proto.Theme]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.Theme) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
-
-
-class Website(IGDBNotionPage[igdb_proto.Website]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(WebsiteType._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name.removeprefix("WEBSITE_")}
-                        for name in igdb_proto.WebsiteCategoryEnum.__members__
-                        if name != "WEBSITE_CATEGORY_NULL"
-                    ]
-                },
-            },
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Trusted": {"type": "checkbox", "checkbox": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(website_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.Website) -> dict[str, dict[str, Any]]:
-        category = (
-            data.category.name.removeprefix("WEBSITE_")
-            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
-            else None
-        )
-
-        return {
-            "ID": {"number": data.id},
-            "Category": {
-                "type": "select",
-                "select": {"name": category} if category else None,
-            },
-            "Trusted": {"checkbox": data.trusted},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Type": {
-                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
-            },
-            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
-        }
-
-    @override
-    @classmethod
-    @functools.cache
-    def get_query_fields(cls) -> tuple[str, ...]:
-        return tuple(
-            itertools.chain(
-                super().get_query_fields(),
-                (f"type.{f}" for f in WebsiteType.get_query_fields()),
-            )
-        )
-
-
-class WebsiteType(IGDBNotionPage[igdb_proto.WebsiteType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Type": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(data: igdb_proto.WebsiteType) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Type": {"title": [{"text": {"content": data.type}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-        }
