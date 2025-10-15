@@ -8,6 +8,10 @@ aiosignal==1.4.0
     # via aiohttp
 aiounittest==1.5.0
     # via howlongtobeatpy
+annotated-doc==0.0.4
+    # via typer
+annotated-types==0.7.0
+    # via pydantic
 anyio==4.12.1
     # via httpx
 astatine==0.3.3
@@ -43,6 +47,7 @@ click==8.3.1
     # via
     #   black
     #   tryceratops
+    #   typer
 cognitive-complexity==1.3.0
     # via flake8-cognitive-complexity
 colorama==0.4.6 ; sys_platform == 'win32'
@@ -59,7 +64,7 @@ domdf-python-tools==3.10.0
     #   astatine
     #   flake8-encodings
 emoji==2.15.0
-    # via notional
+    # via ultimate-notion
 fake-useragent==2.2.0
     # via howlongtobeatpy
 filelock==3.25.2
@@ -161,12 +166,12 @@ howlongtobeatpy==1.0.20
     # via notion-videogames (pyproject.toml)
 hpack==4.1.0
     # via h2
-html5lib==1.1
-    # via notional
 httpcore==1.0.9
     # via httpx
 httpx==0.28.1
-    # via notion-client
+    # via
+    #   notion-client
+    #   ultimate-notion
 hyperframe==6.1.0
     # via h2
 identify==2.6.18
@@ -176,6 +181,7 @@ idna==3.11
     #   anyio
     #   httpx
     #   requests
+    #   url-normalize
     #   yarl
 igdb-api-v4==0.3.3
     # via notion-videogames (pyproject.toml)
@@ -193,6 +199,8 @@ mccabe==0.7.0
     #   pylint
 mdurl==0.1.2
     # via markdown-it-py
+mistune==3.2.0
+    # via ultimate-notion
 multidict==6.7.1
     # via
     #   aiohttp
@@ -208,18 +216,22 @@ natsort==8.4.0
     # via domdf-python-tools
 nodeenv==1.10.0
     # via pre-commit
-notion-client==2.7.0
+notion-client==2.5.0
     # via
     #   notion-videogames (pyproject.toml)
-    #   notional
-notional==0.8.2
-    # via notion-videogames (pyproject.toml)
+    #   ultimate-notion
+numpy==2.4.3
+    # via ultimate-notion
 packaging==26.0
-    # via black
+    # via
+    #   black
+    #   ultimate-notion
 pathspec==1.0.4
     # via
     #   black
     #   mypy
+pendulum==3.2.0
+    # via ultimate-notion
 pep8-naming==0.15.1
     # via notion-videogames (pyproject.toml)
 platformdirs==4.9.4
@@ -240,10 +252,12 @@ pycodestyle==2.14.0
     # via
     #   flake8
     #   flake8-print
-pydantic==1.10.26
+pydantic==2.12.5
     # via
     #   notion-videogames (pyproject.toml)
-    #   notional
+    #   ultimate-notion
+pydantic-core==2.41.5
+    # via pydantic
 pydocstyle==6.3.0
     # via flake8-docstrings
 pyflakes==3.4.0
@@ -253,7 +267,9 @@ pygments==2.19.2
 pylint==4.0.5
     # via notion-videogames (pyproject.toml)
 python-dateutil==2.9.0.post0
-    # via betterproto
+    # via
+    #   betterproto
+    #   pendulum
 python-discovery==1.1.3
     # via virtualenv
 python-dotenv==1.2.2
@@ -273,32 +289,39 @@ rich==14.3.3
     # via
     #   bandit
     #   tryceratops
+    #   typer
 ruff==0.15.7
     # via notion-videogames (pyproject.toml)
 setuptools==82.0.1
     # via
     #   cognitive-complexity
     #   flake8-cognitive-complexity
+shellingham==1.5.4
+    # via typer
 six==1.17.0
-    # via
-    #   html5lib
-    #   python-dateutil
+    # via python-dateutil
 snowballstemmer==3.0.1
     # via pydocstyle
 soupsieve==2.8.3
     # via beautifulsoup4
 stevedore==5.7.0
     # via bandit
+tabulate==0.10.0
+    # via ultimate-notion
 tenacity==9.1.4
     # via notion-videogames (pyproject.toml)
+tomli==2.4.0
+    # via ultimate-notion
+tomli-w==1.2.0
+    # via ultimate-notion
 tomlkit==0.14.0
     # via pylint
 tryceratops==2.4.1
     # via notion-videogames (pyproject.toml)
-types-requests==2.31.0.6
+typer==0.24.1
+    # via ultimate-notion
+types-requests==2.32.4.20260107
     # via notion-videogames (pyproject.toml)
-types-urllib3==1.26.25.14
-    # via types-requests
 typing-extensions==4.15.0
     # via
     #   beautifulsoup4
@@ -307,14 +330,23 @@ typing-extensions==4.15.0
     #   flake8-noqa
     #   mypy
     #   pydantic
-urllib3==1.26.20
+    #   pydantic-core
+    #   typing-inspection
+    #   ultimate-notion
+typing-inspection==0.4.2
+    # via pydantic
+tzdata==2025.3
+    # via pendulum
+ultimate-notion==0.9.6
+    # via notion-videogames (pyproject.toml)
+url-normalize==2.2.1
+    # via ultimate-notion
+urllib3==2.6.3
     # via
-    #   notional
     #   requests
+    #   types-requests
 virtualenv==21.2.0
     # via pre-commit
-webencodings==0.5.1
-    # via html5lib
 wrapt==2.1.2
     # via aiounittest
 yarl==1.23.0

@@ -1,33 +1,17 @@
-# pylint: disable=protected-access,too-many-lines
+# pylint: disable=too-many-lines
 from __future__ import annotations
 
 import functools
 import itertools
 import urllib.parse
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Final, Self, TypeVar, cast, override
+from typing import Any, Final, TypeVar, override
 
 import betterproto
+import ultimate_notion as uno
+from ultimate_notion import PropType
 
 from notion_videogames import igdb_proto, notion
-
-if TYPE_CHECKING:
-    from uuid import UUID
-
-    from notional.query import QueryBuilder
-else:
-
-    def _enum_type__call__(cls: betterproto.enum.EnumType, value: int) -> betterproto.Enum:
-        try:
-            return cls._value_map_[value]
-        except KeyError:
-            return cls.__new__(cls, name=None, value=value)
-        except TypeError:
-            msg = f"{value!r} is not a valid {cls.__name__}"
-            raise ValueError(msg) from None
-
-    # Monkeypatch betterproto.enum.EnumType.__call__ to deal with unknown enum values
-    betterproto.enum.EnumType.__call__ = _enum_type__call__
 
 T = TypeVar("T", bound=betterproto.Message)
 
@@ -45,6 +29,7 @@ def _to_datetime(self: betterproto._Timestamp) -> datetime:
 
 
 # Monkeypatch betterproto._Timestamp.to_datetime to deal with timestamps in milliseconds
+# pylint: disable-next=protected-access
 betterproto._Timestamp.to_datetime = _to_datetime  # type: ignore[method-assign]
 
 
@@ -71,20 +56,17 @@ def add_https_scheme[AnyStr: (bytes, str)](url: AnyStr) -> AnyStr:
     return urllib.parse.urlunparse(new_components)  # type: ignore[no-any-return]
 
 
-class IGDBNotionPage(notion.ConnectablePage[T]):
+class IGDBNotionPage(notion.NotionPageType[T]):
     @override
     @classmethod
-    def retrieve_from_data(cls, data: T) -> Self | None:
+    def retrieve_from_data(cls, data: T) -> uno.Page | None:
         if not hasattr(data, "id"):
             msg = f"{data!r} has no 'id' attribute"
             raise ValueError(msg)
 
-        page: Self | None = (
-            cast("QueryBuilder", cls.query())
-            .filter(property="ID", number={"equals": data.id})
-            .first()
+        return next(
+            iter(cls.schema.get_db().query.filter(uno.prop("ID") == data.id).execute()), None
         )
-        return page
 
     @classmethod
     @functools.cache
@@ -92,22 +74,23 @@ class IGDBNotionPage(notion.ConnectablePage[T]):
         return ("*",)
 
 
-class AgeRatingOrganization(IGDBNotionPage[igdb_proto.AgeRatingOrganization]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class AgeRatingOrganizationSchema(uno.Schema, db_title="Age Rating Organizations"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_age_rating_categories = PropType.Relation(
+        "Related to Age Rating Categories (Organization)"
+    )
+    related_to_age_rating_content_descriptions_v2 = PropType.Relation(
+        "Related to Age Rating Content Descriptions V2 (Organization)"
+    )
+    related_to_age_ratings = PropType.Relation("Related to Age Ratings (Organization)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class AgeRatingOrganization(IGDBNotionPage[igdb_proto.AgeRatingOrganization]):
+    schema = AgeRatingOrganizationSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -121,32 +104,22 @@ class AgeRatingOrganization(IGDBNotionPage[igdb_proto.AgeRatingOrganization]):
         }
 
 
-class AgeRatingCategory(IGDBNotionPage[igdb_proto.AgeRatingCategory]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            AgeRatingOrganization._notional__database,
-        )
+class AgeRatingCategorySchema(uno.Schema, db_title="Age Rating Categories"):
+    id = PropType.Number("ID")
+    rating = PropType.Title("Rating")
+    organization = PropType.Relation(
+        "Organization",
+        schema=AgeRatingOrganizationSchema,
+        two_way_prop=AgeRatingOrganizationSchema.related_to_age_rating_categories,
+    )
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_age_ratings = PropType.Relation("Related to Age Ratings (Rating Category)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(age_rating_organization_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Rating": {"type": "title", "title": {}},
-            "Organization": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_organization_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class AgeRatingCategory(IGDBNotionPage[igdb_proto.AgeRatingCategory]):
+    schema = AgeRatingCategorySchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -182,71 +155,22 @@ class AgeRatingCategory(IGDBNotionPage[igdb_proto.AgeRatingCategory]):
         )
 
 
-class AgeRatingContentDescription(IGDBNotionPage[igdb_proto.AgeRatingContentDescription]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.AgeRatingContentDescriptionCategoryEnum.__members__
-                        if name != "AGERATINGCONTENTDESCRIPTION_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
-
-    @override
-    @staticmethod
-    def get_notion_properties(
-        data: igdb_proto.AgeRatingContentDescription,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"number": data.id},
-            "Category": {
-                "select": (
-                    {"name": data.category.name}
-                    if data.category.name != "AGERATINGCONTENTDESCRIPTION_CATEGORY_NULL"
-                    else None
-                )
-            },
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": f"{data.category.name} - {data.id}"}}]},
-        }
+class AgeRatingContentDescriptionTypeSchema(
+    uno.Schema, db_title="Age Rating Content Description Types"
+):
+    id = PropType.Number("ID")
+    slug = PropType.Text("Slug")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_age_rating_content_descriptions_v2 = PropType.Relation(
+        "Related to Age Rating Content Descriptions V2 (Description Type)"
+    )
 
 
 class AgeRatingContentDescriptionType(IGDBNotionPage[igdb_proto.AgeRatingContentDescriptionType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = AgeRatingContentDescriptionTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -263,44 +187,31 @@ class AgeRatingContentDescriptionType(IGDBNotionPage[igdb_proto.AgeRatingContent
         }
 
 
-class AgeRatingContentDescriptionV2(IGDBNotionPage[igdb_proto.AgeRatingContentDescriptionV2]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            AgeRatingOrganization._notional__database,
-            AgeRatingContentDescriptionType._notional__database,
-        )
+class AgeRatingContentDescriptionV2Schema(
+    uno.Schema, db_title="Age Rating Content Descriptions V2"
+):
+    id = PropType.Number("ID")
+    description = PropType.Title("Description")
+    organization = PropType.Relation(
+        "Organization",
+        schema=AgeRatingOrganizationSchema,
+        two_way_prop=AgeRatingOrganizationSchema.related_to_age_rating_content_descriptions_v2,
+    )
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    description_type = PropType.Relation(
+        "Description Type",
+        schema=AgeRatingContentDescriptionTypeSchema,
+        two_way_prop=AgeRatingContentDescriptionTypeSchema.related_to_age_rating_content_descriptions_v2,
+    )
+    related_to_age_ratings = PropType.Relation(
+        "Related to Age Ratings (Rating Content Descriptions)"
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        age_rating_organization_db_id: str | UUID,
-        age_rating_content_description_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Description": {"type": "title", "title": {}},
-            "Organization": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_organization_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Description Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_content_description_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
+
+class AgeRatingContentDescriptionV2(IGDBNotionPage[igdb_proto.AgeRatingContentDescriptionV2]):
+    schema = AgeRatingContentDescriptionV2Schema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -353,110 +264,38 @@ class AgeRatingContentDescriptionV2(IGDBNotionPage[igdb_proto.AgeRatingContentDe
         )
 
 
-class AgeRating(IGDBNotionPage[igdb_proto.AgeRating]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            AgeRatingContentDescription._notional__database,
-            AgeRatingOrganization._notional__database,
-            AgeRatingCategory._notional__database,
-            AgeRatingContentDescriptionV2._notional__database,
-        )
+class AgeRatingSchema(uno.Schema, db_title="Age Ratings"):
+    id = PropType.Number("ID")
+    rating_cover_url = PropType.URL("Rating Cover URL")
+    synopsis = PropType.Text("Synopsis")
+    checksum = PropType.Text("Checksum")
+    organization = PropType.Relation(
+        "Organization",
+        schema=AgeRatingOrganizationSchema,
+        two_way_prop=AgeRatingOrganizationSchema.related_to_age_ratings,
+    )
+    rating_category = PropType.Relation(
+        "Rating Category",
+        schema=AgeRatingCategorySchema,
+        two_way_prop=AgeRatingCategorySchema.related_to_age_ratings,
+    )
+    rating_content_descriptions = PropType.Relation(
+        "Rating Content Descriptions",
+        schema=AgeRatingContentDescriptionV2Schema,
+        two_way_prop=AgeRatingContentDescriptionV2Schema.related_to_age_ratings,
+    )
+    title = PropType.Title("Title")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Age Ratings)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        age_rating_content_description_db_id: str | UUID,
-        age_rating_organization_db_id: str | UUID,
-        age_rating_category_db_id: str | UUID,
-        age_rating_content_description_v2_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.AgeRatingCategoryEnum.__members__
-                        if name != "AGERATING_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Content Descriptions": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_content_description_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Rating": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.AgeRatingRatingEnum.__members__
-                        if name != "AGERATING_RATING_NULL"
-                    ]
-                },
-            },
-            "Rating Cover URL": {"type": "url", "url": {}},
-            "Synopsis": {"type": "rich_text", "rich_text": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Organization": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_organization_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Rating Category": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_category_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Rating Content Descriptions": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_content_description_v2_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class AgeRating(IGDBNotionPage[igdb_proto.AgeRating]):
+    schema = AgeRatingSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
     def get_notion_properties(data: igdb_proto.AgeRating) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Category": {
-                "select": (
-                    {"name": data.category.name}
-                    if data.category.name != "AGERATING_CATEGORY_NULL"
-                    else None
-                )
-            },
-            "Content Descriptions": {
-                "relation": [
-                    {"id": str(AgeRatingContentDescription.retrieve_or_create_from_data(desc).id)}
-                    for desc in data.content_descriptions
-                ]
-            },
-            "Rating": {
-                "select": (
-                    {"name": data.rating.name}
-                    if data.rating.name != "AGERATING_RATING_NULL"
-                    else None
-                )
-            },
             "Rating Cover URL": {"url": data.rating_cover_url or None},
             "Synopsis": {"rich_text": [{"text": {"content": data.synopsis[:MAX_TEXT_LENGTH]}}]},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
@@ -490,7 +329,7 @@ class AgeRating(IGDBNotionPage[igdb_proto.AgeRating]):
                     for descr in data.rating_content_descriptions
                 ]
             },
-            "Name": {
+            "Title": {
                 "title": [
                     {
                         "text": {
@@ -508,10 +347,6 @@ class AgeRating(IGDBNotionPage[igdb_proto.AgeRating]):
         return tuple(
             itertools.chain(
                 super().get_query_fields(),
-                (
-                    f"content_descriptions.{f}"
-                    for f in AgeRatingContentDescription.get_query_fields()
-                ),
                 (f"organization.{f}" for f in AgeRatingOrganization.get_query_fields()),
                 (f"rating_category.{f}" for f in AgeRatingCategory.get_query_fields()),
                 (
@@ -522,29 +357,17 @@ class AgeRating(IGDBNotionPage[igdb_proto.AgeRating]):
         )
 
 
-class AlternativeName(IGDBNotionPage[igdb_proto.AlternativeName]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class AlternativeNameSchema(uno.Schema, db_title="Alternative Names"):
+    id = PropType.Number("ID")
+    comment = PropType.Text("Comment")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    name = PropType.Title("Name")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Alternative Names)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Comment": {"type": "rich_text", "rich_text": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Name": {"type": "title", "title": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class AlternativeName(IGDBNotionPage[igdb_proto.AlternativeName]):
+    schema = AlternativeNameSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -557,23 +380,18 @@ class AlternativeName(IGDBNotionPage[igdb_proto.AlternativeName]):
         }
 
 
-class ArtworkType(IGDBNotionPage[igdb_proto.ArtworkType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class ArtworkTypeSchema(uno.Schema, db_title="Artwork Types"):
+    id = PropType.Number("ID")
+    slug = PropType.Text("Slug")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_artworks = PropType.Relation("Related to Artworks (Artwork Type)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class ArtworkType(IGDBNotionPage[igdb_proto.ArtworkType]):
+    schema = ArtworkTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -588,42 +406,27 @@ class ArtworkType(IGDBNotionPage[igdb_proto.ArtworkType]):
         }
 
 
-class Artwork(IGDBNotionPage[igdb_proto.Artwork]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(ArtworkType._notional__database)
+class ArtworkSchema(uno.Schema, db_title="Artworks"):
+    id = PropType.Number("ID")
+    alpha_channel = PropType.Checkbox("Alpha Channel")
+    animated = PropType.Checkbox("Animated")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    height = PropType.Number("Height")
+    image_id = PropType.Text("Image ID")
+    url = PropType.URL("URL")
+    width = PropType.Number("Width")
+    checksum = PropType.Text("Checksum")
+    artwork_type = PropType.Relation(
+        "Artwork Type",
+        schema=ArtworkTypeSchema,
+        two_way_prop=ArtworkTypeSchema.related_to_artworks,
+    )
+    title = PropType.Title("Title")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Artworks)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(artwork_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Artwork Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(artwork_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class Artwork(IGDBNotionPage[igdb_proto.Artwork]):
+    schema = ArtworkSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -642,7 +445,7 @@ class Artwork(IGDBNotionPage[igdb_proto.Artwork]):
                     {"id": str(ArtworkType.retrieve_or_create_from_data(data.artwork_type).id)}
                 ]
             },
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -662,37 +465,33 @@ class Artwork(IGDBNotionPage[igdb_proto.Artwork]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.Artwork,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.url:
             icon_url = add_https_scheme(data.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("t_thumb", "t_1080p")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class CompanyLogoSchema(uno.Schema, db_title="Company Logos"):
+    id = PropType.Number("ID")
+    alpha_channel = PropType.Checkbox("Alpha Channel")
+    animated = PropType.Checkbox("Animated")
+    height = PropType.Number("Height")
+    image_id = PropType.Text("Image ID")
+    url = PropType.URL("URL")
+    width = PropType.Number("Width")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_companies = PropType.Relation("Related to Companies (Logo)")
 
 
 class CompanyLogo(IGDBNotionPage[igdb_proto.CompanyLogo]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+    schema = CompanyLogoSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -706,7 +505,7 @@ class CompanyLogo(IGDBNotionPage[igdb_proto.CompanyLogo]):
             "URL": {"url": data.url or None},
             "Width": {"number": data.width},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -715,33 +514,29 @@ class CompanyLogo(IGDBNotionPage[igdb_proto.CompanyLogo]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.CompanyLogo,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.url:
             icon_url = add_https_scheme(data.url).replace("t_thumb", "t_logo_med")
         if not cover_url and icon_url:
             cover_url = icon_url.replace("t_thumb", "t_logo_med")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class CompanyStatusSchema(uno.Schema, db_title="Company Statuses"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_companies = PropType.Relation("Related to Companies (Status)")
 
 
 class CompanyStatus(IGDBNotionPage[igdb_proto.CompanyStatus]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = CompanyStatusSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -755,22 +550,19 @@ class CompanyStatus(IGDBNotionPage[igdb_proto.CompanyStatus]):
         }
 
 
-class WebsiteType(IGDBNotionPage[igdb_proto.WebsiteType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class WebsiteTypeSchema(uno.Schema, db_title="Website Types"):
+    id = PropType.Number("ID")
+    type = PropType.Title("Type")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_company_websites = PropType.Relation("Related to Company Websites (Type)")
+    related_to_platform_websites = PropType.Relation("Related to Platform Websites (Type)")
+    related_to_websites = PropType.Relation("Related to Websites (Type)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Type": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class WebsiteType(IGDBNotionPage[igdb_proto.WebsiteType]):
+    schema = WebsiteTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -784,63 +576,37 @@ class WebsiteType(IGDBNotionPage[igdb_proto.WebsiteType]):
         }
 
 
-class CompanyWebsite(IGDBNotionPage[igdb_proto.CompanyWebsite]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(WebsiteType._notional__database)
+class CompanyWebsiteSchema(uno.Schema, db_title="Company Websites"):
+    id = PropType.Number("ID")
+    trusted = PropType.Checkbox("Trusted")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    type = PropType.Relation(
+        "Type",
+        schema=WebsiteTypeSchema,
+        two_way_prop=WebsiteTypeSchema.related_to_company_websites,
+    )
+    title = PropType.Title("Title")
+    related_to_companies = PropType.Relation("Related to Companies (Websites)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name.removeprefix("WEBSITE_")}
-                        for name in igdb_proto.WebsiteCategoryEnum.__members__
-                        if name != "WEBSITE_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Trusted": {"type": "checkbox", "checkbox": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(website_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class CompanyWebsite(IGDBNotionPage[igdb_proto.CompanyWebsite]):
+    schema = CompanyWebsiteSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
     def get_notion_properties(data: igdb_proto.CompanyWebsite) -> dict[str, dict[str, Any]]:
-        category = (
-            data.category.name.removeprefix("WEBSITE_")
-            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
-            else None
-        )
-
         return {
             "ID": {"number": data.id},
-            "Category": {
-                "type": "select",
-                "select": ({"name": category} if category else None),
-            },
             "Trusted": {"checkbox": data.trusted},
             "URL": {"url": data.url or None},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
             "Type": {
                 "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
             },
-            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
+            "Title": {
+                "title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]
+            },
         }
 
     @override
@@ -855,22 +621,26 @@ class CompanyWebsite(IGDBNotionPage[igdb_proto.CompanyWebsite]):
         )
 
 
-class DateFormat(IGDBNotionPage[igdb_proto.DateFormat]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class DateFormatSchema(uno.Schema, db_title="Date Formats"):
+    id = PropType.Number("ID")
+    format = PropType.Title("Format")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_companies_start_date_format = PropType.Relation(
+        "Related to Companies (Start Date Format)"
+    )
+    related_to_companies_change_date_format = PropType.Relation(
+        "Related to Companies (Change Date Format)"
+    )
+    related_to_platform_version_release_dates = PropType.Relation(
+        "Related to Platform Version Release Dates (Date Format)"
+    )
+    related_to_release_dates = PropType.Relation("Related to Release Dates (Date Format)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Format": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class DateFormat(IGDBNotionPage[igdb_proto.DateFormat]):
+    schema = DateFormatSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -884,120 +654,55 @@ class DateFormat(IGDBNotionPage[igdb_proto.DateFormat]):
         }
 
 
-class Company(IGDBNotionPage[igdb_proto.Company]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            CompanyLogo._notional__database,
-            CompanyWebsite._notional__database,
-            CompanyStatus._notional__database,
-            DateFormat._notional__database,
-        )
+class CompanySchema(uno.Schema, db_title="Companies"):
+    id = PropType.Number("ID")
+    change_date = PropType.Date("Change Date")
+    # changed_company = PropType.Relation("Changed Company", schema=uno.SelfRef)
+    country = PropType.Number("Country")
+    created_at = PropType.Date("Created At")
+    description = PropType.Text("Description")
+    # developed = PropType.Relation("Developed", schema=GameSchema)
+    logo = PropType.Relation(
+        "Logo",
+        schema=CompanyLogoSchema,
+        two_way_prop=CompanyLogoSchema.related_to_companies,
+    )
+    name = PropType.Title("Name")
+    # parent = PropType.Relation("Parent", schema=uno.SelfRef)
+    slug = PropType.Text("Slug")
+    start_date = PropType.Date("Start Date")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    websites = PropType.Relation(
+        "Websites",
+        schema=CompanyWebsiteSchema,
+        two_way_prop=CompanyWebsiteSchema.related_to_companies,
+    )
+    checksum = PropType.Text("Checksum")
+    status = PropType.Relation(
+        "Status",
+        schema=CompanyStatusSchema,
+        two_way_prop=CompanyStatusSchema.related_to_companies,
+    )
+    start_date_format = PropType.Relation(
+        "Start Date Format",
+        schema=DateFormatSchema,
+        two_way_prop=DateFormatSchema.related_to_companies_start_date_format,
+    )
+    change_date_format = PropType.Relation(
+        "Change Date Format",
+        schema=DateFormatSchema,
+        two_way_prop=DateFormatSchema.related_to_companies_change_date_format,
+    )
+    related_to_platform_version_companies = PropType.Relation(
+        "Related to Platform Version Companies (Company)"
+    )
+    related_to_game_engines = PropType.Relation("Related to Game Engines (Companies)")
+    related_to_involved_companies = PropType.Relation("Related to Involved Companies (Company)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        company_logo_db_id: str | UUID,
-        company_website_db_id: str | UUID,
-        company_status_db_id: str | UUID,
-        date_format_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Change Date": {"type": "date", "date": {}},
-            "Change Date Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.DateFormatChangeDateCategoryEnum.__members__
-                    ]
-                },
-            },
-            # "Changed Company ID": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(company_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Country": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            # "Developed": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            # "Parent": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(company_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Start Date": {"type": "date", "date": {}},
-            "Start Date Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.DateFormatChangeDateCategoryEnum.__members__
-                    ]
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Websites": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_website_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Status": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_status_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Start Date Format": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(date_format_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Change Date Format": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(date_format_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
+
+class Company(IGDBNotionPage[igdb_proto.Company]):
+    schema = CompanySchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1005,10 +710,6 @@ class Company(IGDBNotionPage[igdb_proto.Company]):
         return {
             "ID": {"number": data.id},
             "Change Date": {"type": "date", "date": {"start": data.change_date.isoformat()}},
-            "Change Date Category": {
-                "type": "select",
-                "select": {"name": data.change_date_category.name},
-            },
             "Country": {"number": data.country},
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Description": {
@@ -1020,10 +721,6 @@ class Company(IGDBNotionPage[igdb_proto.Company]):
             "Name": {"title": [{"text": {"content": data.name}}]},
             "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
             "Start Date": {"type": "date", "date": {"start": data.start_date.isoformat()}},
-            "Start Date Category": {
-                "type": "select",
-                "select": {"name": data.start_date_category.name},
-            },
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "URL": {"url": data.url or None},
             "Websites": {
@@ -1078,45 +775,35 @@ class Company(IGDBNotionPage[igdb_proto.Company]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.Company,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.logo.url:
             icon_url = add_https_scheme(data.logo.url).replace("t_thumb", "t_logo_med")
         if not cover_url and icon_url:
             cover_url = icon_url.replace("t_thumb", "t_logo_med")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class CoverSchema(uno.Schema, db_title="Covers"):
+    id = PropType.Number("ID")
+    alpha_channel = PropType.Checkbox("Alpha Channel")
+    animated = PropType.Checkbox("Animated")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    height = PropType.Number("Height")
+    image_id = PropType.Text("Image ID")
+    url = PropType.URL("URL")
+    width = PropType.Number("Width")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_game_localizations = PropType.Relation("Related to Game Localizations (Cover)")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Cover)")
 
 
 class Cover(IGDBNotionPage[igdb_proto.Cover]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+    schema = CoverSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1130,7 +817,7 @@ class Cover(IGDBNotionPage[igdb_proto.Cover]):
             "URL": {"url": data.url or None},
             "Width": {"number": data.width},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -1139,33 +826,31 @@ class Cover(IGDBNotionPage[igdb_proto.Cover]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.Cover,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.url:
             icon_url = add_https_scheme(data.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class ExternalGameSourceSchema(uno.Schema, db_title="External Game Sources"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_external_games = PropType.Relation(
+        "Related to External Games (External Game Source)"
+    )
 
 
 class ExternalGameSource(IGDBNotionPage[igdb_proto.ExternalGameSource]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = ExternalGameSourceSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1179,22 +864,19 @@ class ExternalGameSource(IGDBNotionPage[igdb_proto.ExternalGameSource]):
         }
 
 
-class GameReleaseFormat(IGDBNotionPage[igdb_proto.GameReleaseFormat]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class GameReleaseFormatSchema(uno.Schema, db_title="Game Release Formats"):
+    id = PropType.Number("ID")
+    format = PropType.Title("Format")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_external_games = PropType.Relation(
+        "Related to External Games (Game Release Format)"
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Format": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class GameReleaseFormat(IGDBNotionPage[igdb_proto.GameReleaseFormat]):
+    schema = GameReleaseFormatSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1208,21 +890,16 @@ class GameReleaseFormat(IGDBNotionPage[igdb_proto.GameReleaseFormat]):
         }
 
 
-class PlatformFamily(IGDBNotionPage[igdb_proto.PlatformFamily]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class PlatformFamilySchema(uno.Schema, db_title="Platform Families"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    checksum = PropType.Text("Checksum")
+    related_to_platforms = PropType.Relation("Related to Platforms (Platform Family)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class PlatformFamily(IGDBNotionPage[igdb_proto.PlatformFamily]):
+    schema = PlatformFamilySchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1235,26 +912,24 @@ class PlatformFamily(IGDBNotionPage[igdb_proto.PlatformFamily]):
         }
 
 
-class PlatformLogo(IGDBNotionPage[igdb_proto.PlatformLogo]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class PlatformLogoSchema(uno.Schema, db_title="Platform Logos"):
+    id = PropType.Number("ID")
+    alpha_channel = PropType.Checkbox("Alpha Channel")
+    animated = PropType.Checkbox("Animated")
+    height = PropType.Number("Height")
+    image_id = PropType.Text("Image ID")
+    url = PropType.URL("URL")
+    width = PropType.Number("Width")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_platform_versions = PropType.Relation(
+        "Related to Platform Versions (Platform Logo)"
+    )
+    related_to_platforms = PropType.Relation("Related to Platforms (Platform Logo)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class PlatformLogo(IGDBNotionPage[igdb_proto.PlatformLogo]):
+    schema = PlatformLogoSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1268,7 +943,7 @@ class PlatformLogo(IGDBNotionPage[igdb_proto.PlatformLogo]):
             "URL": {"url": data.url or None},
             "Width": {"number": data.width},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -1277,33 +952,29 @@ class PlatformLogo(IGDBNotionPage[igdb_proto.PlatformLogo]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.PlatformLogo,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.url:
             icon_url = add_https_scheme(data.url).replace("t_thumb", "t_logo_med")
         if not cover_url and icon_url:
             cover_url = icon_url.replace("t_thumb", "t_logo_med")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class PlatformTypeSchema(uno.Schema, db_title="Platform Types"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_platforms = PropType.Relation("Related to Platforms (Platform Type)")
 
 
 class PlatformType(IGDBNotionPage[igdb_proto.PlatformType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = PlatformTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1317,31 +988,26 @@ class PlatformType(IGDBNotionPage[igdb_proto.PlatformType]):
         }
 
 
-class PlatformVersionCompany(IGDBNotionPage[igdb_proto.PlatformVersionCompany]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Company._notional__database)
+class PlatformVersionCompanySchema(uno.Schema, db_title="Platform Version Companies"):
+    id = PropType.Number("ID")
+    comment = PropType.Text("Comment")
+    company = PropType.Relation(
+        "Company",
+        schema=CompanySchema,
+        two_way_prop=CompanySchema.related_to_platform_version_companies,
+    )
+    developer = PropType.Checkbox("Developer")
+    manufacturer = PropType.Checkbox("Manufacturer")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_platform_versions_c = PropType.Relation("Related to Platform Versions (Companies)")
+    related_to_platform_versions_m = PropType.Relation(
+        "Related to Platform Versions (Main Manufacturer)"
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(company_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Comment": {"type": "rich_text", "rich_text": {}},
-            "Company": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Developer": {"type": "checkbox", "checkbox": {}},
-            "Manufacturer": {"type": "checkbox", "checkbox": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class PlatformVersionCompany(IGDBNotionPage[igdb_proto.PlatformVersionCompany]):
+    schema = PlatformVersionCompanySchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1357,7 +1023,7 @@ class PlatformVersionCompany(IGDBNotionPage[igdb_proto.PlatformVersionCompany]):
             "Developer": {"checkbox": data.developer},
             "Manufacturer": {"checkbox": data.manufacturer},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": f"{data.company.name} - {data.id}"}}]},
+            "Title": {"title": [{"text": {"content": f"{data.company.name} - {data.id}"}}]},
         }
 
     @override
@@ -1372,22 +1038,20 @@ class PlatformVersionCompany(IGDBNotionPage[igdb_proto.PlatformVersionCompany]):
         )
 
 
-class ReleaseDateRegion(IGDBNotionPage[igdb_proto.ReleaseDateRegion]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class ReleaseDateRegionSchema(uno.Schema, db_title="Release Date Regions"):
+    id = PropType.Number("ID")
+    region = PropType.Title("Region")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_platform_version_release_dates = PropType.Relation(
+        "Related to Platform Version Release Dates (Release Region)"
+    )
+    related_to_release_dates = PropType.Relation("Related to Release Dates (Release Region)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Region": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class ReleaseDateRegion(IGDBNotionPage[igdb_proto.ReleaseDateRegion]):
+    schema = ReleaseDateRegionSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1401,73 +1065,34 @@ class ReleaseDateRegion(IGDBNotionPage[igdb_proto.ReleaseDateRegion]):
         }
 
 
-class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleaseDate]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            DateFormat._notional__database, ReleaseDateRegion._notional__database
-        )
+class PlatformVersionReleaseDateSchema(uno.Schema, db_title="Platform Version Release Dates"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    date = PropType.Date("Date")
+    human = PropType.Text("Human")
+    m = PropType.Number("M")
+    # platform_version = PropType.Relation("Platform Version", schema=PlatformVersionSchema)
+    updated_at = PropType.Date("Updated At")
+    y = PropType.Number("Y")
+    checksum = PropType.Text("Checksum")
+    date_format = PropType.Relation(
+        "Date Format",
+        schema=DateFormatSchema,
+        two_way_prop=DateFormatSchema.related_to_platform_version_release_dates,
+    )
+    release_region = PropType.Relation(
+        "Release Region",
+        schema=ReleaseDateRegionSchema,
+        two_way_prop=ReleaseDateRegionSchema.related_to_platform_version_release_dates,
+    )
+    title = PropType.Title("Title")
+    related_to_platform_versions = PropType.Relation(
+        "Related to Platform Versions (Release Dates)"
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        date_format_db_id: str | UUID, release_date_region_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.DateFormatChangeDateCategoryEnum.__members__
-                    ]
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Date": {"type": "date", "date": {}},
-            "Human": {"type": "rich_text", "rich_text": {}},
-            "M": {"type": "number", "number": {"format": "number"}},
-            # "Platform Version": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(platform_version_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Region": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.RegionRegionEnum.__members__
-                        if name != "REGION_REGION_NULL"
-                    ]
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Y": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Date Format": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(date_format_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Release Region": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(release_date_region_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleaseDate]):
+    schema = PlatformVersionReleaseDateSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1476,19 +1101,10 @@ class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleas
     ) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Category": {"type": "select", "select": {"name": data.category.name}},
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Date": {"type": "date", "date": {"start": data.date.isoformat()}},
             "Human": {"rich_text": [{"text": {"content": data.human}}]},
             "M": {"number": data.m},
-            "Region": {
-                "type": "select",
-                "select": (
-                    {"name": data.region.name}
-                    if data.region.name != "REGION_REGION_NULL"
-                    else None
-                ),
-            },
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Y": {"number": data.y},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
@@ -1506,7 +1122,7 @@ class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleas
                     }
                 ]
             },
-            "Name": {"title": [{"text": {"content": f"{data.y}/{data.m}"}}]},
+            "Title": {"title": [{"text": {"content": f"{data.y}/{data.m}"}}]},
         }
 
     @override
@@ -1522,73 +1138,48 @@ class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleas
         )
 
 
-class PlatformVersion(IGDBNotionPage[igdb_proto.PlatformVersion]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            PlatformVersionCompany._notional__database,
-            PlatformLogo._notional__database,
-            PlatformVersionReleaseDate._notional__database,
-        )
+class PlatformVersionSchema(uno.Schema, db_title="Platform Versions"):
+    id = PropType.Number("ID")
+    companies = PropType.Relation(
+        "Companies",
+        schema=PlatformVersionCompanySchema,
+        two_way_prop=PlatformVersionCompanySchema.related_to_platform_versions_c,
+    )
+    connectivity = PropType.Text("Connectivity")
+    cpu = PropType.Text("CPU")
+    graphics = PropType.Text("Graphics")
+    main_manufacturer = PropType.Relation(
+        "Main Manufacturer",
+        schema=PlatformVersionCompanySchema,
+        two_way_prop=PlatformVersionCompanySchema.related_to_platform_versions_m,
+    )
+    media = PropType.Text("Media")
+    memory = PropType.Text("Memory")
+    name = PropType.Title("Name")
+    os = PropType.Text("OS")
+    output = PropType.Text("Output")
+    platform_logo = PropType.Relation(
+        "Platform Logo",
+        schema=PlatformLogoSchema,
+        two_way_prop=PlatformLogoSchema.related_to_platform_versions,
+    )
+    release_dates = PropType.Relation(
+        "Release Dates",
+        schema=PlatformVersionReleaseDateSchema,
+        two_way_prop=PlatformVersionReleaseDateSchema.related_to_platform_versions,
+    )
+    resolutions = PropType.Text("Resolutions")
+    slug = PropType.Text("Slug")
+    sound = PropType.Text("Sound")
+    storage = PropType.Text("Storage")
+    summary = PropType.Text("Summary")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    related_to_platforms = PropType.Relation("Related to Platforms (Versions)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        platform_version_company_db_id: str | UUID,
-        platform_logo_db_id: str | UUID,
-        platform_version_release_date_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Companies": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_version_company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Connectivity": {"type": "rich_text", "rich_text": {}},
-            "CPU": {"type": "rich_text", "rich_text": {}},
-            "Graphics": {"type": "rich_text", "rich_text": {}},
-            "Main Manufacturer": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_version_company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Media": {"type": "rich_text", "rich_text": {}},
-            "Memory": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},
-            "OS": {"type": "rich_text", "rich_text": {}},
-            "Output": {"type": "rich_text", "rich_text": {}},
-            "Platform Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Release Dates": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_version_release_date_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Resolutions": {"type": "rich_text", "rich_text": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Sound": {"type": "rich_text", "rich_text": {}},
-            "Storage": {"type": "rich_text", "rich_text": {}},
-            "Summary": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class PlatformVersion(IGDBNotionPage[igdb_proto.PlatformVersion]):
+    schema = PlatformVersionSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1669,74 +1260,49 @@ class PlatformVersion(IGDBNotionPage[igdb_proto.PlatformVersion]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.PlatformVersion,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.platform_logo.url:
             icon_url = add_https_scheme(data.platform_logo.url).replace("t_thumb", "t_logo_med")
         if not cover_url and icon_url:
             cover_url = icon_url.replace("t_thumb", "t_logo_med")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class PlatformWebsiteSchema(uno.Schema, db_title="Platform Websites"):
+    id = PropType.Number("ID")
+    trusted = PropType.Checkbox("Trusted")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    type = PropType.Relation(
+        "Type",
+        schema=WebsiteTypeSchema,
+        two_way_prop=WebsiteTypeSchema.related_to_platform_websites,
+    )
+    title = PropType.Title("Title")
+    related_to_platforms = PropType.Relation("Related to Platforms (Websites)")
 
 
 class PlatformWebsite(IGDBNotionPage[igdb_proto.PlatformWebsite]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(WebsiteType._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name.removeprefix("WEBSITE_")}
-                        for name in igdb_proto.WebsiteCategoryEnum.__members__
-                        if name != "WEBSITE_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Trusted": {"type": "checkbox", "checkbox": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(website_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+    schema = PlatformWebsiteSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
     def get_notion_properties(data: igdb_proto.PlatformWebsite) -> dict[str, dict[str, Any]]:
-        category = (
-            data.category.name.removeprefix("WEBSITE_")
-            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
-            else None
-        )
-
         return {
             "ID": {"number": data.id},
-            "Category": {
-                "type": "select",
-                "select": ({"name": category} if category else None),
-            },
             "Trusted": {"checkbox": data.trusted},
             "URL": {"url": data.url or None},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
             "Type": {
                 "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
             },
-            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
+            "Title": {
+                "title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]
+            },
         }
 
     @override
@@ -1751,90 +1317,52 @@ class PlatformWebsite(IGDBNotionPage[igdb_proto.PlatformWebsite]):
         )
 
 
-class Platform(IGDBNotionPage[igdb_proto.Platform]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            PlatformLogo._notional__database,
-            PlatformFamily._notional__database,
-            PlatformVersion._notional__database,
-            PlatformWebsite._notional__database,
-            PlatformType._notional__database,
-        )
+class PlatformSchema(uno.Schema, db_title="Platforms"):
+    id = PropType.Number("ID")
+    abbreviation = PropType.Text("Abbreviation")
+    alternative_name = PropType.Text("Alternative Name")
+    created_at = PropType.Date("Created At")
+    generation = PropType.Number("Generation")
+    name = PropType.Title("Name")
+    platform_logo = PropType.Relation(
+        "Platform Logo",
+        schema=PlatformLogoSchema,
+        two_way_prop=PlatformLogoSchema.related_to_platforms,
+    )
+    platform_family = PropType.Relation(
+        "Platform Family",
+        schema=PlatformFamilySchema,
+        two_way_prop=PlatformFamilySchema.related_to_platforms,
+    )
+    slug = PropType.Text("Slug")
+    summary = PropType.Text("Summary")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    versions = PropType.Relation(
+        "Versions",
+        schema=PlatformVersionSchema,
+        two_way_prop=PlatformVersionSchema.related_to_platforms,
+    )
+    websites = PropType.Relation(
+        "Websites",
+        schema=PlatformWebsiteSchema,
+        two_way_prop=PlatformWebsiteSchema.related_to_platforms,
+    )
+    checksum = PropType.Text("Checksum")
+    platform_type = PropType.Relation(
+        "Platform Type",
+        schema=PlatformTypeSchema,
+        two_way_prop=PlatformTypeSchema.related_to_platforms,
+    )
+    related_to_external_games = PropType.Relation("Related to External Games (Platform)")
+    related_to_game_engines = PropType.Relation("Related to Game Engines (Platforms)")
+    related_to_multiplayer_modes = PropType.Relation("Related to Multiplayer Modes (Platform)")
+    related_to_release_dates = PropType.Relation("Related to Release Dates (Platform)")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Platforms)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        platform_logo_db_id: str | UUID,
-        platform_family_db_id: str | UUID,
-        platform_version_db_id: str | UUID,
-        platform_website_db_id: str | UUID,
-        platform_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Abbreviation": {"type": "rich_text", "rich_text": {}},
-            "Alternative Name": {"type": "rich_text", "rich_text": {}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.PlatformCategoryEnum.__members__
-                        if name != "PLATFORM_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Generation": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Platform Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Platform Family": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_family_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Summary": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Versions": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_version_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Websites": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_website_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Platform Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
+
+class Platform(IGDBNotionPage[igdb_proto.Platform]):
+    schema = PlatformSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -1843,14 +1371,6 @@ class Platform(IGDBNotionPage[igdb_proto.Platform]):
             "ID": {"number": data.id},
             "Abbreviation": {"rich_text": [{"text": {"content": data.abbreviation}}]},
             "Alternative Name": {"rich_text": [{"text": {"content": data.alternative_name}}]},
-            "Category": {
-                "type": "select",
-                "select": (
-                    {"name": data.category.name}
-                    if data.category.name != "PLATFORM_CATEGORY_NULL"
-                    else None
-                ),
-            },
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Generation": {"number": data.generation},
             "Name": {"title": [{"text": {"content": data.name}}]},
@@ -1913,125 +1433,61 @@ class Platform(IGDBNotionPage[igdb_proto.Platform]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.Platform,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.platform_logo.url:
             icon_url = add_https_scheme(data.platform_logo.url).replace("t_thumb", "t_logo_med")
         if not cover_url and icon_url:
             cover_url = icon_url.replace("t_thumb", "t_logo_med")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class ExternalGameSchema(uno.Schema, db_title="External Games"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    name = PropType.Title("Name")
+    uid = PropType.Text("UID")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    year = PropType.Number("Year")
+    platform = PropType.Relation(
+        "Platform",
+        schema=PlatformSchema,
+        two_way_prop=PlatformSchema.related_to_external_games,
+    )
+    # countries = PropType.MultiSelect("Countries")
+    checksum = PropType.Text("Checksum")
+    external_game_source = PropType.Relation(
+        "External Game Source",
+        schema=ExternalGameSourceSchema,
+        two_way_prop=ExternalGameSourceSchema.related_to_external_games,
+    )
+    game_release_format = PropType.Relation(
+        "Game Release Format",
+        schema=GameReleaseFormatSchema,
+        two_way_prop=GameReleaseFormatSchema.related_to_external_games,
+    )
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (External Games)")
 
 
 class ExternalGame(IGDBNotionPage[igdb_proto.ExternalGame]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Platform._notional__database,
-            ExternalGameSource._notional__database,
-            GameReleaseFormat._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        platform_db_id: str | UUID,
-        external_game_source_db_id: str | UUID,
-        game_release_format_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name.removeprefix("EXTERNALGAME_")}
-                        for name in igdb_proto.ExternalGameCategoryEnum.__members__
-                        if name != "EXTERNALGAME_CATEGORY_NULL"
-                    ]
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Name": {"type": "title", "title": {}},
-            "UID": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Year": {"type": "number", "number": {"format": "number"}},
-            "Media": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name.removeprefix("EXTERNALGAME_")}
-                        for name in igdb_proto.ExternalGameMediaEnum.__members__
-                        if name != "EXTERNALGAME_MEDIA_NULL"
-                    ]
-                },
-            },
-            "Platform": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            # "Countries": {"type": "multi_select", "multi_select": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "External Game Source": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(external_game_source_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Game Release Format": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_release_format_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
+    schema = ExternalGameSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
     def get_notion_properties(data: igdb_proto.ExternalGame) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Category": {
-                "type": "select",
-                "select": (
-                    {"name": data.category.name.removeprefix("EXTERNALGAME_")}
-                    if data.category.name and data.category.name != "EXTERNALGAME_CATEGORY_NULL"
-                    else None
-                ),
-            },
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Name": {"title": [{"text": {"content": data.name}}]},
             "UID": {"rich_text": [{"text": {"content": data.uid}}]},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "URL": {"url": data.url or None},
             "Year": {"number": data.year},
-            "Media": {
-                "type": "select",
-                "select": (
-                    {"name": data.media.name.removeprefix("EXTERNALGAME_")}
-                    if data.media.name and data.media.name != "EXTERNALGAME_MEDIA_NULL"
-                    else None
-                ),
-            },
             "Platform": {
                 "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
             },
@@ -2076,32 +1532,20 @@ class ExternalGame(IGDBNotionPage[igdb_proto.ExternalGame]):
         )
 
 
-class Franchise(IGDBNotionPage[igdb_proto.Franchise]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class FranchiseSchema(uno.Schema, db_title="Franchises"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    # games = PropType.Relation("Games", schema=GameSchema)
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Franchises)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            # "Games": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class Franchise(IGDBNotionPage[igdb_proto.Franchise]):
+    schema = FranchiseSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2117,26 +1561,21 @@ class Franchise(IGDBNotionPage[igdb_proto.Franchise]):
         }
 
 
-class GameEngineLogo(IGDBNotionPage[igdb_proto.GameEngineLogo]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class GameEngineLogoSchema(uno.Schema, db_title="Game Engine Logos"):
+    id = PropType.Number("ID")
+    alpha_channel = PropType.Checkbox("Alpha Channel")
+    animated = PropType.Checkbox("Animated")
+    height = PropType.Number("Height")
+    image_id = PropType.Text("Image ID")
+    url = PropType.URL("URL")
+    width = PropType.Number("Width")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_game_engines = PropType.Relation("Related to Game Engines (Logo)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class GameEngineLogo(IGDBNotionPage[igdb_proto.GameEngineLogo]):
+    schema = GameEngineLogoSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2150,7 +1589,7 @@ class GameEngineLogo(IGDBNotionPage[igdb_proto.GameEngineLogo]):
             "URL": {"url": data.url or None},
             "Width": {"number": data.width},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -2159,66 +1598,47 @@ class GameEngineLogo(IGDBNotionPage[igdb_proto.GameEngineLogo]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.GameEngineLogo,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.url:
             icon_url = add_https_scheme(data.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class GameEngineSchema(uno.Schema, db_title="Game Engines"):
+    id = PropType.Number("ID")
+    companies = PropType.Relation(
+        "Companies",
+        schema=CompanySchema,
+        two_way_prop=CompanySchema.related_to_game_engines,
+    )
+    created_at = PropType.Date("Created At")
+    description = PropType.Text("Description")
+    logo = PropType.Relation(
+        "Logo",
+        schema=GameEngineLogoSchema,
+        two_way_prop=GameEngineLogoSchema.related_to_game_engines,
+    )
+    name = PropType.Title("Name")
+    platforms = PropType.Relation(
+        "Platforms",
+        schema=PlatformSchema,
+        two_way_prop=PlatformSchema.related_to_game_engines,
+    )
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Game Engines)")
 
 
 class GameEngine(IGDBNotionPage[igdb_proto.GameEngine]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Company._notional__database,
-            GameEngineLogo._notional__database,
-            Platform._notional__database,
-        )
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        company_db_id: str | UUID, game_engine_logo_db_id: str | UUID, platform_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Companies": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_engine_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            "Platforms": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = GameEngineSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2272,35 +1692,31 @@ class GameEngine(IGDBNotionPage[igdb_proto.GameEngine]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.GameEngine,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.logo.url:
             icon_url = add_https_scheme(data.logo.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class RegionSchema(uno.Schema, db_title="Regions"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    category = PropType.Text("Category")
+    identifier = PropType.Text("Identifier")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_game_localizations = PropType.Relation("Related to Game Localizations (Region)")
 
 
 class Region(IGDBNotionPage[igdb_proto.Region]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Category": {"type": "rich_text", "rich_text": {}},
-            "Identifier": {"type": "rich_text", "rich_text": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = RegionSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2316,51 +1732,28 @@ class Region(IGDBNotionPage[igdb_proto.Region]):
         }
 
 
-class GameLocalization(IGDBNotionPage[igdb_proto.GameLocalization]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Cover._notional__database,
-            Region._notional__database,
-        )
+class GameLocalizationSchema(uno.Schema, db_title="Game Localizations"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    cover = PropType.Relation(
+        "Cover",
+        schema=CoverSchema,
+        two_way_prop=CoverSchema.related_to_game_localizations,
+    )
+    region = PropType.Relation(
+        "Region",
+        schema=RegionSchema,
+        two_way_prop=RegionSchema.related_to_game_localizations,
+    )
+    # game = PropType.Relation("Game", schema=GameSchema)
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Game Localizations)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        cover_db_id: str | UUID, region_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Cover": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(cover_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Region": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(region_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class GameLocalization(IGDBNotionPage[igdb_proto.GameLocalization]):
+    schema = GameLocalizationSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2398,35 +1791,31 @@ class GameLocalization(IGDBNotionPage[igdb_proto.GameLocalization]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.GameLocalization,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.cover.url:
             icon_url = add_https_scheme(data.cover.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class GameModeSchema(uno.Schema, db_title="Game Modes"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Game Modes)")
 
 
 class GameMode(IGDBNotionPage[igdb_proto.GameMode]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = GameModeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2442,22 +1831,17 @@ class GameMode(IGDBNotionPage[igdb_proto.GameMode]):
         }
 
 
-class GameStatus(IGDBNotionPage[igdb_proto.GameStatus]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class GameStatusSchema(uno.Schema, db_title="Game Statuses"):
+    id = PropType.Number("ID")
+    status = PropType.Title("Status")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Game Status)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Status": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class GameStatus(IGDBNotionPage[igdb_proto.GameStatus]):
+    schema = GameStatusSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2471,22 +1855,17 @@ class GameStatus(IGDBNotionPage[igdb_proto.GameStatus]):
         }
 
 
-class GameType(IGDBNotionPage[igdb_proto.GameType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class GameTypeSchema(uno.Schema, db_title="Game Types"):
+    id = PropType.Number("ID")
+    type = PropType.Title("Type")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Game Type)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Type": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class GameType(IGDBNotionPage[igdb_proto.GameType]):
+    schema = GameTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2500,29 +1879,17 @@ class GameType(IGDBNotionPage[igdb_proto.GameType]):
         }
 
 
-class GameVideo(IGDBNotionPage[igdb_proto.GameVideo]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class GameVideoSchema(uno.Schema, db_title="Game Videos"):
+    id = PropType.Number("ID")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    name = PropType.Title("Name")
+    video_id = PropType.Text("Video ID")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Videos)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Name": {"type": "title", "title": {}},
-            "Video ID": {"type": "rich_text", "rich_text": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class GameVideo(IGDBNotionPage[igdb_proto.GameVideo]):
+    schema = GameVideoSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2535,24 +1902,19 @@ class GameVideo(IGDBNotionPage[igdb_proto.GameVideo]):
         }
 
 
-class Genre(IGDBNotionPage[igdb_proto.Genre]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class GenreSchema(uno.Schema, db_title="Genres"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Genres)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class Genre(IGDBNotionPage[igdb_proto.Genre]):
+    schema = GenreSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2568,42 +1930,27 @@ class Genre(IGDBNotionPage[igdb_proto.Genre]):
         }
 
 
-class InvolvedCompany(IGDBNotionPage[igdb_proto.InvolvedCompany]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Company._notional__database)
+class InvolvedCompanySchema(uno.Schema, db_title="Involved Companies"):
+    id = PropType.Number("ID")
+    company = PropType.Relation(
+        "Company",
+        schema=CompanySchema,
+        two_way_prop=CompanySchema.related_to_involved_companies,
+    )
+    created_at = PropType.Date("Created At")
+    developer = PropType.Checkbox("Developer")
+    porting = PropType.Checkbox("Porting")
+    publisher = PropType.Checkbox("Publisher")
+    supporting = PropType.Checkbox("Supporting")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    title = PropType.Title("Title")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Involved Companies)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(company_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Company": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Developer": {"type": "checkbox", "checkbox": {}},
-            "Porting": {"type": "checkbox", "checkbox": {}},
-            "Publisher": {"type": "checkbox", "checkbox": {}},
-            "Supporting": {"type": "checkbox", "checkbox": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class InvolvedCompany(IGDBNotionPage[igdb_proto.InvolvedCompany]):
+    schema = InvolvedCompanySchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2620,7 +1967,7 @@ class InvolvedCompany(IGDBNotionPage[igdb_proto.InvolvedCompany]):
             "Supporting": {"checkbox": data.supporting},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": data.company.name}}]},
+            "Title": {"title": [{"text": {"content": data.company.name}}]},
         }
 
     @override
@@ -2640,35 +1987,31 @@ class InvolvedCompany(IGDBNotionPage[igdb_proto.InvolvedCompany]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.InvolvedCompany,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.company.logo.url:
             icon_url = add_https_scheme(data.company.logo.url).replace("t_thumb", "t_logo_med")
         if not cover_url and icon_url:
             cover_url = icon_url.replace("t_thumb", "t_logo_med")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class KeywordSchema(uno.Schema, db_title="Keywords"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Keywords)")
 
 
 class Keyword(IGDBNotionPage[igdb_proto.Keyword]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = KeywordSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2684,24 +2027,19 @@ class Keyword(IGDBNotionPage[igdb_proto.Keyword]):
         }
 
 
-class Language(IGDBNotionPage[igdb_proto.Language]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class LanguageSchema(uno.Schema, db_title="Languages"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    native_name = PropType.Text("Native Name")
+    locale = PropType.Text("Locale")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_language_supports = PropType.Relation("Related to Language Supports (Language)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Native Name": {"type": "rich_text", "rich_text": {}},
-            "Locale": {"type": "rich_text", "rich_text": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class Language(IGDBNotionPage[igdb_proto.Language]):
+    schema = LanguageSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2717,22 +2055,19 @@ class Language(IGDBNotionPage[igdb_proto.Language]):
         }
 
 
-class LanguageSupportType(IGDBNotionPage[igdb_proto.LanguageSupportType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class LanguageSupportTypeSchema(uno.Schema, db_title="Language Support Types"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_language_supports = PropType.Relation(
+        "Related to Language Supports (Language Support Type)"
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class LanguageSupportType(IGDBNotionPage[igdb_proto.LanguageSupportType]):
+    schema = LanguageSupportTypeSchema  # type: ignore[mutable-override]
 
     @override
     @classmethod
@@ -2748,51 +2083,28 @@ class LanguageSupportType(IGDBNotionPage[igdb_proto.LanguageSupportType]):
         }
 
 
-class LanguageSupport(IGDBNotionPage[igdb_proto.LanguageSupport]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Language._notional__database,
-            LanguageSupportType._notional__database,
-        )
+class LanguageSupportSchema(uno.Schema, db_title="Language Supports"):
+    id = PropType.Number("ID")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    language = PropType.Relation(
+        "Language",
+        schema=LanguageSchema,
+        two_way_prop=LanguageSchema.related_to_language_supports,
+    )
+    language_support_type = PropType.Relation(
+        "Language Support Type",
+        schema=LanguageSupportTypeSchema,
+        two_way_prop=LanguageSupportTypeSchema.related_to_language_supports,
+    )
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Language Supports)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        language_db_id: str | UUID, language_support_type_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Language": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(language_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Language Support Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(language_support_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class LanguageSupport(IGDBNotionPage[igdb_proto.LanguageSupport]):
+    schema = LanguageSupportSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2816,7 +2128,7 @@ class LanguageSupport(IGDBNotionPage[igdb_proto.LanguageSupport]):
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {
+            "Title": {
                 "title": [
                     {
                         "text": {
@@ -2841,47 +2153,32 @@ class LanguageSupport(IGDBNotionPage[igdb_proto.LanguageSupport]):
         )
 
 
-class MultiplayerMode(IGDBNotionPage[igdb_proto.MultiplayerMode]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Platform._notional__database)
+class MultiplayerModeSchema(uno.Schema, db_title="Multiplayer Modes"):
+    id = PropType.Number("ID")
+    campaigncoop = PropType.Checkbox("Campaign Coop")
+    dropin = PropType.Checkbox("Drop In")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    lancoop = PropType.Checkbox("LAN Coop")
+    offlinecoop = PropType.Checkbox("Offline Coop")
+    offlinecoopmax = PropType.Number("Offline Coop Max")
+    offlinemax = PropType.Number("Offline Max")
+    onlinecoop = PropType.Checkbox("Online Coop")
+    onlinecoopmax = PropType.Number("Online Coop Max")
+    onlinemax = PropType.Number("Online Max")
+    platform = PropType.Relation(
+        "Platform",
+        schema=PlatformSchema,
+        two_way_prop=PlatformSchema.related_to_multiplayer_modes,
+    )
+    splitscreen = PropType.Checkbox("Split Screen")
+    splitscreenonline = PropType.Checkbox("Split Screen Online")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Multiplayer Modes)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(platform_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Campaign Coop": {"type": "checkbox", "checkbox": {}},
-            "Drop In": {"type": "checkbox", "checkbox": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "LAN Coop": {"type": "checkbox", "checkbox": {}},
-            "Offline Coop": {"type": "checkbox", "checkbox": {}},
-            "Offline Coop Max": {"type": "number", "number": {"format": "number"}},
-            "Offline Max": {"type": "number", "number": {"format": "number"}},
-            "Online Coop": {"type": "checkbox", "checkbox": {}},
-            "Online Coop Max": {"type": "number", "number": {"format": "number"}},
-            "Online Max": {"type": "number", "number": {"format": "number"}},
-            "Platform": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Split Screen": {"type": "checkbox", "checkbox": {}},
-            "Split Screen Online": {"type": "checkbox", "checkbox": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class MultiplayerMode(IGDBNotionPage[igdb_proto.MultiplayerMode]):
+    schema = MultiplayerModeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -2903,7 +2200,7 @@ class MultiplayerMode(IGDBNotionPage[igdb_proto.MultiplayerMode]):
             "Split Screen": {"checkbox": data.splitscreen},
             "Split Screen Online": {"checkbox": data.splitscreenonline},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": f"{data.platform.name} - {data.id}"}}]},
+            "Title": {"title": [{"text": {"content": f"{data.platform.name} - {data.id}"}}]},
         }
 
     @override
@@ -2919,24 +2216,19 @@ class MultiplayerMode(IGDBNotionPage[igdb_proto.MultiplayerMode]):
         )
 
 
-class PlayerPerspective(IGDBNotionPage[igdb_proto.PlayerPerspective]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class PlayerPerspectiveSchema(uno.Schema, db_title="Player Perspectives"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Player Perspectives)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class PlayerPerspective(IGDBNotionPage[igdb_proto.PlayerPerspective]):
+    schema = PlayerPerspectiveSchema  # type: ignore[mutable-override]
 
     @override
     @classmethod
@@ -2954,23 +2246,18 @@ class PlayerPerspective(IGDBNotionPage[igdb_proto.PlayerPerspective]):
         }
 
 
-class ReleaseDateStatus(IGDBNotionPage[igdb_proto.ReleaseDateStatus]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class ReleaseDateStatusSchema(uno.Schema, db_title="Release Date Statuses"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    description = PropType.Text("Description")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_release_dates = PropType.Relation("Related to Release Dates (Status)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class ReleaseDateStatus(IGDBNotionPage[igdb_proto.ReleaseDateStatus]):
+    schema = ReleaseDateStatusSchema  # type: ignore[mutable-override]
 
     @override
     @classmethod
@@ -2989,117 +2276,55 @@ class ReleaseDateStatus(IGDBNotionPage[igdb_proto.ReleaseDateStatus]):
         }
 
 
-class ReleaseDate(IGDBNotionPage[igdb_proto.ReleaseDate]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Platform._notional__database,
-            ReleaseDateStatus._notional__database,
-            DateFormat._notional__database,
-            ReleaseDateRegion._notional__database,
-        )
+class ReleaseDateSchema(uno.Schema, db_title="Release Dates"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    date = PropType.Date("Date")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    human = PropType.Text("Human")
+    m = PropType.Number("M")
+    platform = PropType.Relation(
+        "Platform",
+        schema=PlatformSchema,
+        two_way_prop=PlatformSchema.related_to_release_dates,
+    )
+    updated_at = PropType.Date("Updated At")
+    y = PropType.Number("Y")
+    checksum = PropType.Text("Checksum")
+    status = PropType.Relation(
+        "Status",
+        schema=ReleaseDateStatusSchema,
+        two_way_prop=ReleaseDateStatusSchema.related_to_release_dates,
+    )
+    date_format = PropType.Relation(
+        "Date Format",
+        schema=DateFormatSchema,
+        two_way_prop=DateFormatSchema.related_to_release_dates,
+    )
+    release_region = PropType.Relation(
+        "Release Region",
+        schema=ReleaseDateRegionSchema,
+        two_way_prop=ReleaseDateRegionSchema.related_to_release_dates,
+    )
+    d = PropType.Number("D")
+    title = PropType.Title("Title")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Release Dates)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        platform_db_id: str | UUID,
-        release_date_status_db_id: str | UUID,
-        date_format_db_id: str | UUID,
-        release_date_region_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.DateFormatChangeDateCategoryEnum.__members__
-                    ]
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Date": {"type": "date", "date": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Human": {"type": "rich_text", "rich_text": {}},
-            "M": {"type": "number", "number": {"format": "number"}},
-            "Platform": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Region": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.RegionRegionEnum.__members__
-                        if name != "REGION_REGION_NULL"
-                    ]
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Y": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Status": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(release_date_status_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Date Format": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(date_format_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Release Region": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(release_date_region_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "D": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class ReleaseDate(IGDBNotionPage[igdb_proto.ReleaseDate]):
+    schema = ReleaseDateSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
     def get_notion_properties(data: igdb_proto.ReleaseDate) -> dict[str, dict[str, Any]]:
         return {
             "ID": {"number": data.id},
-            "Category": {"type": "select", "select": {"name": data.category.name}},
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Date": {"type": "date", "date": {"start": data.date.isoformat()}},
             "Human": {"rich_text": [{"text": {"content": data.human}}]},
             "M": {"number": data.m},
             "Platform": {
                 "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
-            },
-            "Region": {
-                "type": "select",
-                "select": (
-                    {"name": data.region.name}
-                    if data.region.name != "REGION_REGION_NULL"
-                    else None
-                ),
             },
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Y": {"number": data.y},
@@ -3124,7 +2349,7 @@ class ReleaseDate(IGDBNotionPage[igdb_proto.ReleaseDate]):
                 ]
             },
             "D": {"number": data.d},
-            "Name": {
+            "Title": {
                 "title": [{"text": {"content": f"{data.platform.name} - {data.y}/{data.m}"}}]
             },
         }
@@ -3145,34 +2370,22 @@ class ReleaseDate(IGDBNotionPage[igdb_proto.ReleaseDate]):
         )
 
 
-class Screenshot(IGDBNotionPage[igdb_proto.Screenshot]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class ScreenshotSchema(uno.Schema, db_title="Screenshots"):
+    id = PropType.Number("ID")
+    alpha_channel = PropType.Checkbox("Alpha Channel")
+    animated = PropType.Checkbox("Animated")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    height = PropType.Number("Height")
+    image_id = PropType.Text("Image ID")
+    url = PropType.URL("URL")
+    width = PropType.Number("Width")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Screenshots)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class Screenshot(IGDBNotionPage[igdb_proto.Screenshot]):
+    schema = ScreenshotSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -3186,7 +2399,7 @@ class Screenshot(IGDBNotionPage[igdb_proto.Screenshot]):
             "URL": {"url": data.url or None},
             "Width": {"number": data.width},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -3195,35 +2408,31 @@ class Screenshot(IGDBNotionPage[igdb_proto.Screenshot]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.Screenshot,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.url:
             icon_url = add_https_scheme(data.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("t_thumb", "t_1080p")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class ThemeSchema(uno.Schema, db_title="Themes"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Themes)")
 
 
 class Theme(IGDBNotionPage[igdb_proto.Theme]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = ThemeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -3239,71 +2448,38 @@ class Theme(IGDBNotionPage[igdb_proto.Theme]):
         }
 
 
-class Website(IGDBNotionPage[igdb_proto.Website]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(WebsiteType._notional__database)
+class WebsiteSchema(uno.Schema, db_title="Websites"):
+    id = PropType.Number("ID")
+    # game = PropType.Relation("Game", schema=GameSchema)
+    trusted = PropType.Checkbox("Trusted")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    type = PropType.Relation(
+        "Type",
+        schema=WebsiteTypeSchema,
+        two_way_prop=WebsiteTypeSchema.related_to_websites,
+    )
+    title = PropType.Title("Title")
+    related_to_igdb_games = PropType.Relation("Related to IGDB Games (Websites)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(website_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name.removeprefix("WEBSITE_")}
-                        for name in igdb_proto.WebsiteCategoryEnum.__members__
-                        if name != "WEBSITE_CATEGORY_NULL"
-                    ]
-                },
-            },
-            # "Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Trusted": {"type": "checkbox", "checkbox": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(website_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class Website(IGDBNotionPage[igdb_proto.Website]):
+    schema = WebsiteSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
     def get_notion_properties(data: igdb_proto.Website) -> dict[str, dict[str, Any]]:
-        category = (
-            data.category.name.removeprefix("WEBSITE_")
-            if data.category.name and data.category.name != "WEBSITE_CATEGORY_NULL"
-            else None
-        )
-
         return {
             "ID": {"number": data.id},
-            "Category": {
-                "type": "select",
-                "select": {"name": category} if category else None,
-            },
             "Trusted": {"checkbox": data.trusted},
             "URL": {"url": data.url or None},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
             "Type": {
                 "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
             },
-            "Name": {"title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]},
+            "Title": {
+                "title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]
+            },
         }
 
     @override
@@ -3318,402 +2494,157 @@ class Website(IGDBNotionPage[igdb_proto.Website]):
         )
 
 
-class Game(IGDBNotionPage[igdb_proto.Game]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            AgeRating._notional__database,
-            AlternativeName._notional__database,
-            Artwork._notional__database,
-            Cover._notional__database,
-            ExternalGame._notional__database,
-            Franchise._notional__database,
-            GameEngine._notional__database,
-            GameMode._notional__database,
-            Genre._notional__database,
-            InvolvedCompany._notional__database,
-            Keyword._notional__database,
-            MultiplayerMode._notional__database,
-            Platform._notional__database,
-            PlayerPerspective._notional__database,
-            ReleaseDate._notional__database,
-            Screenshot._notional__database,
-            Theme._notional__database,
-            GameVideo._notional__database,
-            Website._notional__database,
-            LanguageSupport._notional__database,
-            GameLocalization._notional__database,
-            GameStatus._notional__database,
-            GameType._notional__database,
-        )
+class GameSchema(uno.Schema, db_title="IGDB Games"):
+    id = PropType.Number("ID")
+    age_ratings = PropType.Relation(
+        "Age Ratings",
+        schema=AgeRatingSchema,
+        two_way_prop=AgeRatingSchema.related_to_igdb_games,
+    )
+    aggregated_rating = PropType.Number("Aggregated Rating")
+    aggregated_rating_count = PropType.Number("Aggregated Rating Count")
+    alternative_names = PropType.Relation(
+        "Alternative Names",
+        schema=AlternativeNameSchema,
+        two_way_prop=AlternativeNameSchema.related_to_igdb_games,
+    )
+    artworks = PropType.Relation(
+        "Artworks",
+        schema=ArtworkSchema,
+        two_way_prop=ArtworkSchema.related_to_igdb_games,
+    )
+    # bundles = PropType.Relation("Bundles", schema=uno.SelfRef)
+    cover = PropType.Relation(
+        "Cover",
+        schema=CoverSchema,
+        two_way_prop=CoverSchema.related_to_igdb_games,
+    )
+    created_at = PropType.Date("Created At")
+    # dlcs = PropType.Relation("DLCs", schema=uno.SelfRef)
+    # expansions = PropType.Relation("Expansions", schema=uno.SelfRef)
+    external_games = PropType.Relation(
+        "External Games",
+        schema=ExternalGameSchema,
+        two_way_prop=ExternalGameSchema.related_to_igdb_games,
+    )
+    first_release_date = PropType.Date("First Release Date")
+    franchises = PropType.Relation(
+        "Franchises",
+        schema=FranchiseSchema,
+        two_way_prop=FranchiseSchema.related_to_igdb_games,
+    )
+    game_engines = PropType.Relation(
+        "Game Engines",
+        schema=GameEngineSchema,
+        two_way_prop=GameEngineSchema.related_to_igdb_games,
+    )
+    game_modes = PropType.Relation(
+        "Game Modes",
+        schema=GameModeSchema,
+        two_way_prop=GameModeSchema.related_to_igdb_games,
+    )
+    genres = PropType.Relation(
+        "Genres",
+        schema=GenreSchema,
+        two_way_prop=GenreSchema.related_to_igdb_games,
+    )
+    hypes = PropType.Number("Hypes")
+    involved_companies = PropType.Relation(
+        "Involved Companies",
+        schema=InvolvedCompanySchema,
+        two_way_prop=InvolvedCompanySchema.related_to_igdb_games,
+    )
+    keywords = PropType.Relation(
+        "Keywords",
+        schema=KeywordSchema,
+        two_way_prop=KeywordSchema.related_to_igdb_games,
+    )
+    multiplayer_modes = PropType.Relation(
+        "Multiplayer Modes",
+        schema=MultiplayerModeSchema,
+        two_way_prop=MultiplayerModeSchema.related_to_igdb_games,
+    )
+    name = PropType.Title("Name")
+    # parent_game = PropType.Relation("Parent Game", schema=uno.SelfRef)
+    platforms = PropType.Relation(
+        "Platforms",
+        schema=PlatformSchema,
+        two_way_prop=PlatformSchema.related_to_igdb_games,
+    )
+    player_perspectives = PropType.Relation(
+        "Player Perspectives",
+        schema=PlayerPerspectiveSchema,
+        two_way_prop=PlayerPerspectiveSchema.related_to_igdb_games,
+    )
+    rating = PropType.Number("Rating")
+    rating_count = PropType.Number("Rating Count")
+    release_dates = PropType.Relation(
+        "Release Dates",
+        schema=ReleaseDateSchema,
+        two_way_prop=ReleaseDateSchema.related_to_igdb_games,
+    )
+    screenshots = PropType.Relation(
+        "Screenshots",
+        schema=ScreenshotSchema,
+        two_way_prop=ScreenshotSchema.related_to_igdb_games,
+    )
+    # similar_games = PropType.Relation("Similar Games", schema=uno.SelfRef)
+    slug = PropType.Text("Slug")
+    # standalone_expansions = PropType.Relation("Standalone Expansions", schema=uno.SelfRef)
+    storyline = PropType.Text("Storyline")
+    summary = PropType.Text("Summary")
+    themes = PropType.Relation(
+        "Themes",
+        schema=ThemeSchema,
+        two_way_prop=ThemeSchema.related_to_igdb_games,
+    )
+    total_rating = PropType.Number("Total Rating")
+    total_rating_count = PropType.Number("Total Rating Count")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    # version_parent = PropType.Relation("Version Parent", schema=uno.SelfRef)
+    version_title = PropType.Text("Version Title")
+    videos = PropType.Relation(
+        "Videos",
+        schema=GameVideoSchema,
+        two_way_prop=GameVideoSchema.related_to_igdb_games,
+    )
+    websites = PropType.Relation(
+        "Websites",
+        schema=WebsiteSchema,
+        two_way_prop=WebsiteSchema.related_to_igdb_games,
+    )
+    checksum = PropType.Text("Checksum")
+    # remakes = PropType.Relation("Remakes", schema=uno.SelfRef)
+    # remasters = PropType.Relation("Remasters", schema=uno.SelfRef)
+    # expanded_games = PropType.Relation("Expanded Games", schema=uno.SelfRef)
+    # ports = PropType.Relation("Ports", schema=uno.SelfRef)
+    # forks = PropType.Relation("Forks", schema=uno.SelfRef)
+    language_supports = PropType.Relation(
+        "Language Supports",
+        schema=LanguageSupportSchema,
+        two_way_prop=LanguageSupportSchema.related_to_igdb_games,
+    )
+    game_localizations = PropType.Relation(
+        "Game Localizations",
+        schema=GameLocalizationSchema,
+        two_way_prop=GameLocalizationSchema.related_to_igdb_games,
+    )
+    # collections = PropType.Relation("Collections", schema=CollectionSchema)
+    game_status = PropType.Relation(
+        "Game Status",
+        schema=GameStatusSchema,
+        two_way_prop=GameStatusSchema.related_to_igdb_games,
+    )
+    game_type = PropType.Relation(
+        "Game Type",
+        schema=GameTypeSchema,
+        two_way_prop=GameTypeSchema.related_to_igdb_games,
+    )
 
-    @staticmethod
-    @functools.cache
-    # pylint: disable-next=too-many-arguments,too-many-positional-arguments,too-many-locals
-    def _get_notion_schema(  # noqa: PLR0913
-        age_rating_db_id: str | UUID,
-        alternative_name_db_id: str | UUID,
-        artwork_db_id: str | UUID,
-        cover_db_id: str | UUID,
-        external_game_db_id: str | UUID,
-        franchise_db_id: str | UUID,
-        game_engine_db_id: str | UUID,
-        game_mode_db_id: str | UUID,
-        genre_db_id: str | UUID,
-        involved_company_db_id: str | UUID,
-        keyword_db_id: str | UUID,
-        multiplayer_mode_db_id: str | UUID,
-        platform_db_id: str | UUID,
-        player_perspective_db_id: str | UUID,
-        release_date_db_id: str | UUID,
-        screenshot_db_id: str | UUID,
-        theme_db_id: str | UUID,
-        game_video_db_id: str | UUID,
-        website_db_id: str | UUID,
-        language_support_db_id: str | UUID,
-        game_localization_db_id: str | UUID,
-        game_status_db_id: str | UUID,
-        game_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Age Ratings": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(age_rating_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Aggregated Rating": {"type": "number", "number": {"format": "number"}},
-            "Aggregated Rating Count": {"type": "number", "number": {"format": "number"}},
-            "Alternative Names": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(alternative_name_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Artworks": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(artwork_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            # "Bundles": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [{"name": name} for name in igdb_proto.GameCategoryEnum.__members__]
-                },
-            },
-            # "Collection": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(collection_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Cover": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(cover_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            # "DLCs": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            # "Expansions": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            "External Games": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(external_game_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "First Release Date": {"type": "date", "date": {}},
-            # "Follows": {"type": "number", "number": {"format": "number"}},
-            # "Franchise": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(franchise_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            "Franchises": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(franchise_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Game Engines": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_engine_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Game Modes": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_mode_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Genres": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(genre_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Hypes": {"type": "number", "number": {"format": "number"}},
-            "Involved Companies": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(involved_company_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Keywords": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(keyword_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Multiplayer Modes": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(multiplayer_mode_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            # "Parent Game": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            "Platforms": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Player Perspectives": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(player_perspective_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Rating": {"type": "number", "number": {"format": "number"}},
-            "Rating Count": {"type": "number", "number": {"format": "number"}},
-            "Release Dates": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(release_date_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Screenshots": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(screenshot_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            # "Similar Games": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            # "Standalone Expansions": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            "Status": {
-                "type": "select",
-                "select": {
-                    "options": [{"name": name} for name in igdb_proto.GameStatusEnum.__members__]
-                },
-            },
-            "Storyline": {"type": "rich_text", "rich_text": {}},
-            "Summary": {"type": "rich_text", "rich_text": {}},
-            # "Tags": {"type": "multi_select", "multi_select": {}},
-            "Themes": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(theme_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Total Rating": {"type": "number", "number": {"format": "number"}},
-            "Total Rating Count": {"type": "number", "number": {"format": "number"}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            # "Version Parent": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            # "Version Title": {"type": "rich_text", "rich_text": {}},
-            "Videos": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_video_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Websites": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(website_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            # "Remakes": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            # "Remasters": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            # "Expanded Games": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            # "Ports": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            # "Forks": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_db_id),
-            #         "type": "dual_property",
-            #         "dual_property": {},
-            #     },
-            # },
-            "Language Supports": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(language_support_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Game Localizations": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_localization_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            # "Collections": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(collection_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Game Status": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_status_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Game Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
+
+class Game(IGDBNotionPage[igdb_proto.Game]):
+    schema = GameSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -3739,11 +2670,6 @@ class Game(IGDBNotionPage[igdb_proto.Game]):
                     {"id": str(Artwork.retrieve_or_create_from_data(artwork).id)}
                     for artwork in data.artworks
                 ]
-            },
-            "Category": {
-                "type": "select",
-                # "select": {"name": igdb_proto.GameCategoryEnum(data.category).name},
-                "select": {"name": data.category.name},
             },
             # "Collection": {
             #     "relation": [
@@ -3841,11 +2767,6 @@ class Game(IGDBNotionPage[igdb_proto.Game]):
                 ]
             },
             "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Status": {
-                "type": "select",
-                # "select": {"name": igdb_proto.GameStatusEnum(data.status).name},
-                "select": {"name": data.status.name},
-            },
             "Storyline": {"rich_text": [{"text": {"content": data.storyline[:MAX_TEXT_LENGTH]}}]},
             "Summary": {"rich_text": [{"text": {"content": data.summary}}]},
             # "Tags": {"multi_select": [{"name": str(tag)} for tag in data.tags]},
@@ -3859,7 +2780,7 @@ class Game(IGDBNotionPage[igdb_proto.Game]):
             "Total Rating Count": {"number": data.total_rating_count},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "URL": {"url": data.url or None},
-            # "Version Title": {"rich_text": [{"text": {"content": data.version_title}}]},
+            "Version Title": {"rich_text": [{"text": {"content": data.version_title}}]},
             "Videos": {
                 "relation": [
                     {"id": str(GameVideo.retrieve_or_create_from_data(vid).id)}
@@ -3954,34 +2875,39 @@ class Game(IGDBNotionPage[igdb_proto.Game]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.Game,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.cover.url:
             icon_url = add_https_scheme(data.cover.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class CollectionTypeSchema(uno.Schema, db_title="Collection Types"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    description = PropType.Text("Description")
+    updated_at = PropType.Date("Updated At")
+    created_at = PropType.Date("Created At")
+    checksum = PropType.Text("Checksum")
+    related_to_collections = PropType.Relation("Related to Collections (Type)")
+    related_to_collection_membership_types = PropType.Relation(
+        "Related to Collection Membership Types (Allowed Collection Type)"
+    )
+    related_to_collection_relation_types_allowed_child_type = PropType.Relation(
+        "Related to Collection Relation Types (Allowed Child Type)"
+    )
+    related_to_collection_relation_types_allowed_parent_type = PropType.Relation(
+        "Related to Collection Relation Types (Allowed Parent Type)"
+    )
 
 
 class CollectionType(IGDBNotionPage[igdb_proto.CollectionType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = CollectionTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -3998,61 +2924,37 @@ class CollectionType(IGDBNotionPage[igdb_proto.CollectionType]):
         }
 
 
-class Collection(IGDBNotionPage[igdb_proto.Collection]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Game._notional__database,
-            CollectionType._notional__database,
-        )
+class CollectionSchema(uno.Schema, db_title="Collections"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    games = PropType.Relation("Games", schema=GameSchema)
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    type = PropType.Relation(
+        "Type",
+        schema=CollectionTypeSchema,
+        two_way_prop=CollectionTypeSchema.related_to_collections,
+    )
+    # as_parent_relations = PropType.Relation(
+    #     "As Parent Relations", schema=CollectionRelationSchema
+    # )
+    # as_child_relations = PropType.Relation("As Child Relations", schema=CollectionRelationSchema)
+    related_to_collection_memberships = PropType.Relation(
+        "Related to Collection Memberships (Collection)"
+    )
+    related_to_collection_relations_child_collection = PropType.Relation(
+        "Related to Collection Relations (Child Collection)"
+    )
+    related_to_collection_relations_parent_collection = PropType.Relation(
+        "Related to Collection Relations (Parent Collection)"
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        game_db_id: str | UUID, collection_type_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Games": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            # "As Parent Relations": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(collection_relation_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            # "As Child Relations": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(collection_relation_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-        }
+
+class Collection(IGDBNotionPage[igdb_proto.Collection]):
+    schema = CollectionSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4098,35 +3000,25 @@ class Collection(IGDBNotionPage[igdb_proto.Collection]):
         )
 
 
-class CollectionMembershipType(IGDBNotionPage[igdb_proto.CollectionMembershipType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            CollectionType._notional__database,
-        )
+class CollectionMembershipTypeSchema(uno.Schema, db_title="Collection Membership Types"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    description = PropType.Text("Description")
+    allowed_collection_type = PropType.Relation(
+        "Allowed Collection Type",
+        schema=CollectionTypeSchema,
+        two_way_prop=CollectionTypeSchema.related_to_collection_membership_types,
+    )
+    updated_at = PropType.Date("Updated At")
+    created_at = PropType.Date("Created At")
+    checksum = PropType.Text("Checksum")
+    related_to_collection_memberships = PropType.Relation(
+        "Related to Collection Memberships (Type)"
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        collection_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Allowed Collection Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class CollectionMembershipType(IGDBNotionPage[igdb_proto.CollectionMembershipType]):
+    schema = CollectionMembershipTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4167,54 +3059,27 @@ class CollectionMembershipType(IGDBNotionPage[igdb_proto.CollectionMembershipTyp
         )
 
 
-class CollectionMembership(IGDBNotionPage[igdb_proto.CollectionMembership]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Game._notional__database,
-            Collection._notional__database,
-            CollectionMembershipType._notional__database,
-        )
+class CollectionMembershipSchema(uno.Schema, db_title="Collection Memberships"):
+    id = PropType.Number("ID")
+    game = PropType.Relation("Game", schema=GameSchema)
+    collection = PropType.Relation(
+        "Collection",
+        schema=CollectionSchema,
+        two_way_prop=CollectionSchema.related_to_collection_memberships,
+    )
+    type = PropType.Relation(
+        "Type",
+        schema=CollectionMembershipTypeSchema,
+        two_way_prop=CollectionMembershipTypeSchema.related_to_collection_memberships,
+    )
+    updated_at = PropType.Date("Updated At")
+    created_at = PropType.Date("Created At")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        game_db_id: str | UUID,
-        collection_db_id: str | UUID,
-        collection_membership_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Game": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Collection": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_membership_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class CollectionMembership(IGDBNotionPage[igdb_proto.CollectionMembership]):
+    schema = CollectionMembershipSchema  # type: ignore[mutable-override]
 
     @override
     @classmethod
@@ -4241,7 +3106,7 @@ class CollectionMembership(IGDBNotionPage[igdb_proto.CollectionMembership]):
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {
+            "Title": {
                 "title": [
                     {
                         "text": {
@@ -4267,43 +3132,28 @@ class CollectionMembership(IGDBNotionPage[igdb_proto.CollectionMembership]):
         )
 
 
-class CollectionRelationType(IGDBNotionPage[igdb_proto.CollectionRelationType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            CollectionType._notional__database,
-        )
+class CollectionRelationTypeSchema(uno.Schema, db_title="Collection Relation Types"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    description = PropType.Text("Description")
+    allowed_child_type = PropType.Relation(
+        "Allowed Child Type",
+        schema=CollectionTypeSchema,
+        two_way_prop=CollectionTypeSchema.related_to_collection_relation_types_allowed_child_type,
+    )
+    allowed_parent_type = PropType.Relation(
+        "Allowed Parent Type",
+        schema=CollectionTypeSchema,
+        two_way_prop=CollectionTypeSchema.related_to_collection_relation_types_allowed_parent_type,
+    )
+    updated_at = PropType.Date("Updated At")
+    created_at = PropType.Date("Created At")
+    checksum = PropType.Text("Checksum")
+    related_to_collection_relations = PropType.Relation("Related to Collection Relations (Type)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        collection_type_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Allowed Child Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Allowed Parent Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class CollectionRelationType(IGDBNotionPage[igdb_proto.CollectionRelationType]):
+    schema = CollectionRelationTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4354,51 +3204,31 @@ class CollectionRelationType(IGDBNotionPage[igdb_proto.CollectionRelationType]):
         )
 
 
-class CollectionRelation(IGDBNotionPage[igdb_proto.CollectionRelation]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Collection._notional__database,
-            CollectionRelationType._notional__database,
-        )
+class CollectionRelationSchema(uno.Schema, db_title="Collection Relations"):
+    id = PropType.Number("ID")
+    child_collection = PropType.Relation(
+        "Child Collection",
+        schema=CollectionSchema,
+        two_way_prop=CollectionSchema.related_to_collection_relations_child_collection,
+    )
+    parent_collection = PropType.Relation(
+        "Parent Collection",
+        schema=CollectionSchema,
+        two_way_prop=CollectionSchema.related_to_collection_relations_parent_collection,
+    )
+    type = PropType.Relation(
+        "Type",
+        schema=CollectionRelationTypeSchema,
+        two_way_prop=CollectionRelationTypeSchema.related_to_collection_relations,
+    )
+    updated_at = PropType.Date("Updated At")
+    created_at = PropType.Date("Created At")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        collection_db_id: str | UUID, collection_relation_type_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Child Collection": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Parent Collection": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_relation_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class CollectionRelation(IGDBNotionPage[igdb_proto.CollectionRelation]):
+    schema = CollectionRelationSchema  # type: ignore[mutable-override]
 
     @override
     @classmethod
@@ -4425,7 +3255,7 @@ class CollectionRelation(IGDBNotionPage[igdb_proto.CollectionRelation]):
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {
+            "Title": {
                 "title": [
                     {
                         "text": {
@@ -4451,27 +3281,21 @@ class CollectionRelation(IGDBNotionPage[igdb_proto.CollectionRelation]):
         )
 
 
-class GameTimeToBeat(IGDBNotionPage[igdb_proto.GameTimeToBeat]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class GameTimeToBeatSchema(uno.Schema, db_title="Game Times To Beat"):
+    id = PropType.Number("ID")
+    game_id = PropType.Number("Game ID")
+    hastily = PropType.Number("Hastily")
+    normally = PropType.Number("Normally")
+    completely = PropType.Number("Completely")
+    count = PropType.Number("Count")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Game ID": {"type": "number", "number": {"format": "number"}},
-            "Hastily": {"type": "number", "number": {"format": "number"}},
-            "Normally": {"type": "number", "number": {"format": "number"}},
-            "Completely": {"type": "number", "number": {"format": "number"}},
-            "Count": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},
-        }
+
+class GameTimeToBeat(IGDBNotionPage[igdb_proto.GameTimeToBeat]):
+    schema = GameTimeToBeatSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4486,50 +3310,31 @@ class GameTimeToBeat(IGDBNotionPage[igdb_proto.GameTimeToBeat]):
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
+
+
+class GameVersionFeatureValueSchema(uno.Schema, db_title="Game Version Feature Values"):
+    id = PropType.Number("ID")
+    game = PropType.Relation("Game", schema=GameSchema)
+    # game_feature = PropType.Relation("Game Feature", schema=GameVersionFeatureSchema)
+    included_feature = PropType.Select(
+        "Included Feature",
+        options=[
+            uno.Option(nm)
+            for nm in igdb_proto.GameVersionFeatureValueIncludedFeatureEnum.__members__
+        ],
+    )
+    note = PropType.Text("Note")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_game_version_features = PropType.Relation(
+        "Related to Game Version Features (Values)"
+    )
 
 
 class GameVersionFeatureValue(IGDBNotionPage[igdb_proto.GameVersionFeatureValue]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Game._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(game_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Game": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            # "Game Feature": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(game_version_feature_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Included Feature": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": nm}
-                        for nm in igdb_proto.GameVersionFeatureValueIncludedFeatureEnum.__members__
-                    ]
-                },
-            },
-            "Note": {"type": "rich_text", "rich_text": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+    schema = GameVersionFeatureValueSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4564,43 +3369,28 @@ class GameVersionFeatureValue(IGDBNotionPage[igdb_proto.GameVersionFeatureValue]
         )
 
 
-class GameVersionFeature(IGDBNotionPage[igdb_proto.GameVersionFeature]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            GameVersionFeatureValue._notional__database,
-        )
+class GameVersionFeatureSchema(uno.Schema, db_title="Game Version Features"):
+    id = PropType.Number("ID")
+    category = PropType.Select(
+        "Category",
+        options=[
+            uno.Option(name) for name in igdb_proto.GameVersionFeatureCategoryEnum.__members__
+        ],
+    )
+    description = PropType.Text("Description")
+    position = PropType.Number("Position")
+    title = PropType.Title("Title")
+    values = PropType.Relation(
+        "Values",
+        schema=GameVersionFeatureValueSchema,
+        two_way_prop=GameVersionFeatureValueSchema.related_to_game_version_features,
+    )
+    checksum = PropType.Text("Checksum")
+    related_to_game_versions = PropType.Relation("Related to Game Versions (Features)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        game_version_feature_value_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Category": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.GameVersionFeatureCategoryEnum.__members__
-                    ]
-                },
-            },
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Position": {"type": "number", "number": {"format": "number"}},
-            "Title": {"type": "title", "title": {}},
-            "Values": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_version_feature_value_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class GameVersionFeature(IGDBNotionPage[igdb_proto.GameVersionFeature]):
+    schema = GameVersionFeatureSchema  # type: ignore[mutable-override]
 
     @override
     @classmethod
@@ -4636,52 +3426,24 @@ class GameVersionFeature(IGDBNotionPage[igdb_proto.GameVersionFeature]):
         )
 
 
-class GameVersion(IGDBNotionPage[igdb_proto.GameVersion]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            GameVersionFeature._notional__database,
-            Game._notional__database,
-        )
+class CollectionVersionSchema(uno.Schema, db_title="Collection Versions"):
+    id = PropType.Number("ID")
+    created_at = PropType.Date("Created At")
+    features = PropType.Relation(
+        "Features",
+        schema=GameVersionFeatureSchema,
+        two_way_prop=GameVersionFeatureSchema.related_to_game_versions,
+    )
+    game = PropType.Relation("Game", schema=GameSchema)
+    games = PropType.Relation("Games", schema=GameSchema)
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        game_version_feature_db_id: str | UUID, game_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Features": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_version_feature_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Game": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Games": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class GameVersion(IGDBNotionPage[igdb_proto.GameVersion]):
+    schema = CollectionVersionSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4704,7 +3466,7 @@ class GameVersion(IGDBNotionPage[igdb_proto.GameVersion]):
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "URL": {"url": data.url or None},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -4721,22 +3483,17 @@ class GameVersion(IGDBNotionPage[igdb_proto.GameVersion]):
         )
 
 
-class CharacterGender(IGDBNotionPage[igdb_proto.CharacterGender]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class CharacterGenderSchema(uno.Schema, db_title="Character Genders"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_characters = PropType.Relation("Related to Characters (Character Gender)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class CharacterGender(IGDBNotionPage[igdb_proto.CharacterGender]):
+    schema = CharacterGenderSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4750,26 +3507,21 @@ class CharacterGender(IGDBNotionPage[igdb_proto.CharacterGender]):
         }
 
 
-class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class CharacterMugShotSchema(uno.Schema, db_title="Character Mug Shots"):
+    id = PropType.Number("ID")
+    alpha_channel = PropType.Checkbox("Alpha Channel")
+    animated = PropType.Checkbox("Animated")
+    height = PropType.Number("Height")
+    image_id = PropType.Text("Image ID")
+    url = PropType.URL("URL")
+    width = PropType.Number("Width")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_characters = PropType.Relation("Related to Characters (Mug Shot)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
+    schema = CharacterMugShotSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4783,7 +3535,7 @@ class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
             "URL": {"url": data.url or None},
             "Width": {"number": data.width},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -4792,33 +3544,29 @@ class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.CharacterMugShot,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.url:
             icon_url = add_https_scheme(data.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class CharacterSpecieSchema(uno.Schema, db_title="Character Species"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_characters = PropType.Relation("Related to Characters (Character Species)")
 
 
 class CharacterSpecie(IGDBNotionPage[igdb_proto.CharacterSpecie]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = CharacterSpecieSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4832,85 +3580,37 @@ class CharacterSpecie(IGDBNotionPage[igdb_proto.CharacterSpecie]):
         }
 
 
-class Character(IGDBNotionPage[igdb_proto.Character]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Game._notional__database,
-            CharacterMugShot._notional__database,
-            CharacterGender._notional__database,
-            CharacterSpecie._notional__database,
-        )
+class CharacterSchema(uno.Schema, db_title="Characters"):
+    id = PropType.Number("ID")
+    akas = PropType.MultiSelect("AKAs", options=[])
+    country_name = PropType.Text("Country Name")
+    created_at = PropType.Date("Created At")
+    description = PropType.Text("Description")
+    games = PropType.Relation("Games", schema=GameSchema)
+    mug_shot = PropType.Relation(
+        "Mug Shot",
+        schema=CharacterMugShotSchema,
+        two_way_prop=CharacterMugShotSchema.related_to_characters,
+    )
+    name = PropType.Title("Name")
+    slug = PropType.Text("Slug")
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
+    character_gender = PropType.Relation(
+        "Character Gender",
+        schema=CharacterGenderSchema,
+        two_way_prop=CharacterGenderSchema.related_to_characters,
+    )
+    character_species = PropType.Relation(
+        "Character Species",
+        schema=CharacterSpecieSchema,
+        two_way_prop=CharacterSpecieSchema.related_to_characters,
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        game_db_id: str | UUID,
-        character_mug_shot_db_id: str | UUID,
-        character_gender_db_id: str | UUID,
-        character_specie_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "AKAs": {"type": "multi_select", "multi_select": {}},
-            "Country Name": {"type": "rich_text", "rich_text": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Games": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Gender": {
-                "type": "select",
-                "select": {
-                    "options": [{"name": name} for name in igdb_proto.GenderGenderEnum.__members__]
-                },
-            },
-            "Mug Shot": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(character_mug_shot_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Species": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.CharacterSpeciesEnum.__members__
-                        if name != "CHARACTER_SPECIES_NULL"
-                    ]
-                },
-            },
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Character Gender": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(character_gender_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Character Species": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(character_specie_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
+
+class Character(IGDBNotionPage[igdb_proto.Character]):
+    schema = CharacterSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -4928,7 +3628,6 @@ class Character(IGDBNotionPage[igdb_proto.Character]):
                     {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
                 ]
             },
-            "Gender": {"type": "select", "select": {"name": data.gender.name}},
             "Mug Shot": {
                 "relation": [
                     {"id": str(CharacterMugShot.retrieve_or_create_from_data(data.mug_shot).id)}
@@ -4936,14 +3635,6 @@ class Character(IGDBNotionPage[igdb_proto.Character]):
             },
             "Name": {"title": [{"text": {"content": data.name}}]},
             "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Species": {
-                "type": "select",
-                "select": (
-                    {"name": data.species.name}
-                    if data.species.name != "CHARACTER_SPECIES_NULL"
-                    else None
-                ),
-            },
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "URL": {"url": data.url or None},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
@@ -4987,47 +3678,34 @@ class Character(IGDBNotionPage[igdb_proto.Character]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.Character,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.mug_shot.url:
             icon_url = add_https_scheme(data.mug_shot.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class EventLogoSchema(uno.Schema, db_title="Event Logos"):
+    id = PropType.Number("ID")
+    # events = PropType.Relation("Events", schema=EventSchema)
+    alpha_channel = PropType.Checkbox("Alpha Channel")
+    animated = PropType.Checkbox("Animated")
+    height = PropType.Number("Height")
+    image_id = PropType.Text("Image ID")
+    url = PropType.URL("URL")
+    width = PropType.Number("Width")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_events = PropType.Relation("Related to Events (Event Logo)")
 
 
 class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            # "Event": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(event_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Alpha Channel": {"type": "checkbox", "checkbox": {}},
-            "Animated": {"type": "checkbox", "checkbox": {}},
-            "Height": {"type": "number", "number": {"format": "number"}},
-            "Image ID": {"type": "rich_text", "rich_text": {}},
-            "URL": {"type": "url", "url": {}},
-            "Width": {"type": "number", "number": {"format": "number"}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+    schema = EventLogoSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -5043,7 +3721,7 @@ class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": str(data.id)}}]},
+            "Title": {"title": [{"text": {"content": str(data.id)}}]},
         }
 
     @override
@@ -5052,41 +3730,30 @@ class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.EventLogo,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.url:
             icon_url = add_https_scheme(data.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_original/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class NetworkTypeSchema(uno.Schema, db_title="Network Types"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    # event_networks = PropType.Relation("Event Networks", schema=EventNetworkSchema)
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    related_to_event_networks = PropType.Relation("Related to Event Networks (Network Type)")
 
 
 class NetworkType(IGDBNotionPage[igdb_proto.NetworkType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            # "Event Networks": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(event_network_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+    schema = NetworkTypeSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -5100,39 +3767,24 @@ class NetworkType(IGDBNotionPage[igdb_proto.NetworkType]):
         }
 
 
-class EventNetwork(IGDBNotionPage[igdb_proto.EventNetwork]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(NetworkType._notional__database)
+class EventNetworkSchema(uno.Schema, db_title="Event Networks"):
+    id = PropType.Number("ID")
+    # event = PropType.Relation("Event", schema=EventSchema)
+    url = PropType.URL("URL")
+    network_type = PropType.Relation(
+        "Network Type",
+        schema=NetworkTypeSchema,
+        two_way_prop=NetworkTypeSchema.related_to_event_networks,
+    )
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    title = PropType.Title("Title")
+    related_to_events = PropType.Relation("Related to Events (Event Networks)")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(network_type_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            # "Event": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(event_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "URL": {"type": "url", "url": {}},
-            "Network Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(network_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class EventNetwork(IGDBNotionPage[igdb_proto.EventNetwork]):
+    schema = EventNetworkSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -5148,7 +3800,7 @@ class EventNetwork(IGDBNotionPage[igdb_proto.EventNetwork]):
             "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
             "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
             "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {"title": [{"text": {"content": f"{data.network_type.name} - {data.id}"}}]},
+            "Title": {"title": [{"text": {"content": f"{data.network_type.name} - {data.id}"}}]},
         }
 
     @override
@@ -5164,70 +3816,34 @@ class EventNetwork(IGDBNotionPage[igdb_proto.EventNetwork]):
         )
 
 
-class Event(IGDBNotionPage[igdb_proto.Event]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            EventLogo._notional__database,
-            Game._notional__database,
-            GameVideo._notional__database,
-            EventNetwork._notional__database,
-        )
+class EventSchema(uno.Schema, db_title="Events"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    description = PropType.Text("Description")
+    slug = PropType.Text("Slug")
+    event_logo = PropType.Relation(
+        "Event Logo",
+        schema=EventLogoSchema,
+        two_way_prop=EventLogoSchema.related_to_events,
+    )
+    start_time = PropType.Date("Start Time")
+    time_zone = PropType.Text("Time Zone")
+    end_time = PropType.Date("End Time")
+    live_stream_url = PropType.URL("Live Stream URL")
+    games = PropType.Relation("Games", schema=GameSchema)
+    videos = PropType.Relation("Videos", schema=GameVideoSchema)
+    event_networks = PropType.Relation(
+        "Event Networks",
+        schema=EventNetworkSchema,
+        two_way_prop=EventNetworkSchema.related_to_events,
+    )
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        event_logo_db_id: str | UUID,
-        game_db_id: str | UUID,
-        game_video_db_id: str | UUID,
-        event_network_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "Event Logo": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(event_logo_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Start Time": {"type": "date", "date": {}},
-            "Time Zone": {"type": "rich_text", "rich_text": {}},
-            "End Time": {"type": "date", "date": {}},
-            "Live Stream URL": {"type": "url", "url": {}},
-            "Games": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Videos": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_video_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Event Networks": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(event_network_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class Event(IGDBNotionPage[igdb_proto.Event]):
+    schema = EventSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -5290,53 +3906,34 @@ class Event(IGDBNotionPage[igdb_proto.Event]):
     def retrieve_or_create_from_data(
         cls,
         data: igdb_proto.Event,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.event_logo.url:
             icon_url = add_https_scheme(data.event_logo.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_original/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+
+
+class PopularityTypeSchema(uno.Schema, db_title="Popularity Types"):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    external_popularity_source = PropType.Relation(
+        "External Popularity Source", schema=ExternalGameSourceSchema
+    )
+    related_to_popularity_primitives = PropType.Relation(
+        "Related to Popularity Primitives (Popularity Type)"
+    )
 
 
 class PopularityType(IGDBNotionPage[igdb_proto.PopularityType]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(ExternalGameSource._notional__database)
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        external_game_source_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Popularity Source": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.PopularitySourcePopularitySourceEnum.__members__
-                        if name != "POPULARITYSOURCE_POPULARITY_SOURCE_NULL"
-                    ]
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "External Popularity Source": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(external_game_source_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-        }
+    schema = PopularityTypeSchema  # type: ignore[mutable-override]
 
     @override
     @classmethod
@@ -5380,67 +3977,33 @@ class PopularityType(IGDBNotionPage[igdb_proto.PopularityType]):
         )
 
 
-class PopularityPrimitive(IGDBNotionPage[igdb_proto.PopularityPrimitive]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            PopularityType._notional__database, ExternalGameSource._notional__database
-        )
+class PopularityPrimitiveSchema(uno.Schema, db_title="Popularity Primitives"):
+    id = PropType.Number("ID")
+    game_id = PropType.Number("Game ID")
+    popularity_type = PropType.Relation(
+        "Popularity Type",
+        schema=PopularityTypeSchema,
+        two_way_prop=PopularityTypeSchema.related_to_popularity_primitives,
+    )
+    value = PropType.Number("Value")
+    calculated_at = PropType.Date("Calculated At")
+    created_at = PropType.Date("Created At")
+    updated_at = PropType.Date("Updated At")
+    checksum = PropType.Text("Checksum")
+    external_popularity_source = PropType.Relation(
+        "External Popularity Source", schema=ExternalGameSourceSchema
+    )
+    title = PropType.Title("Title")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        popularity_type_db_id: str | UUID, external_game_source_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Game ID": {"type": "number", "number": {"format": "number"}},
-            "Popularity Type": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(popularity_type_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Popularity Source": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.PopularitySourcePopularitySourceEnum.__members__
-                        if name != "POPULARITYSOURCE_POPULARITY_SOURCE_NULL"
-                    ]
-                },
-            },
-            "Value": {"type": "number", "number": {"format": "number"}},
-            "Calculated At": {"type": "date", "date": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Updated At": {"type": "date", "date": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-            "External Popularity Source": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(external_game_source_db_id),
-                    "type": "dual_property",
-                    "dual_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},  # This is a required property
-        }
+
+class PopularityPrimitive(IGDBNotionPage[igdb_proto.PopularityPrimitive]):
+    schema = PopularityPrimitiveSchema  # type: ignore[mutable-override]
 
     @override
     @classmethod
     def get_notion_properties(
         cls, data: igdb_proto.PopularityPrimitive
     ) -> dict[str, dict[str, Any]]:
-        pop_src = (
-            data.popularity_source.name
-            if data.popularity_source.name != "POPULARITYSOURCE_POPULARITY_SOURCE_NULL"
-            else None
-        )
-
         return {
             "ID": {"number": data.id},
             "Game ID": {"number": data.game_id},
@@ -5452,10 +4015,6 @@ class PopularityPrimitive(IGDBNotionPage[igdb_proto.PopularityPrimitive]):
                         )
                     }
                 ]
-            },
-            "Popularity Source": {
-                "type": "select",
-                "select": ({"name": pop_src} if pop_src else None),
             },
             "Value": {"number": data.value},
             "Calculated At": {"type": "date", "date": {"start": data.calculated_at.isoformat()}},
@@ -5473,7 +4032,7 @@ class PopularityPrimitive(IGDBNotionPage[igdb_proto.PopularityPrimitive]):
                     }
                 ]
             },
-            "Name": {
+            "Title": {
                 "title": [
                     {
                         "text": {
@@ -5504,71 +4063,36 @@ class PopularityPrimitive(IGDBNotionPage[igdb_proto.PopularityPrimitive]):
         )
 
 
-class TestDummy(IGDBNotionPage[igdb_proto.TestDummy]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(Game._notional__database)
+class TestDummySchema(uno.Schema, db_title="Test Dummies"):
+    id = PropType.Number("ID")
+    bool_value = PropType.Checkbox("Bool Value")
+    created_at = PropType.Date("Created At")
+    enum_test = PropType.Select(
+        "Enum Test",
+        options=[
+            uno.Option(name)
+            for name in igdb_proto.TestDummyEnumTestEnum.__members__
+            if name != "TESTDUMMY_ENUM_TEST_NULL"
+        ],
+    )
+    float_value = PropType.Number("Float Value")
+    game = PropType.Relation("Game", schema=GameSchema)
+    integer_array = PropType.Text("Integer Array")  # Stored as a string, needs parsing
+    integer_value = PropType.Number("Integer Value")
+    name = PropType.Title("Name")
+    new_integer_value = PropType.Number("New Integer Value")
+    private = PropType.Checkbox("Private")
+    slug = PropType.Text("Slug")
+    string_array = PropType.Text("String Array")  # Stored as a string, needs parsing
+    test_dummies = PropType.Relation("Test Dummies", schema=uno.SelfRef)
+    test_dummy = PropType.Relation("Test Dummy", schema=uno.SelfRef)
+    updated_at = PropType.Date("Updated At")
+    url = PropType.URL("URL")
+    checksum = PropType.Text("Checksum")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(game_db_id: str | UUID) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Bool Value": {"type": "checkbox", "checkbox": {}},
-            "Created At": {"type": "date", "date": {}},
-            "Enum Test": {
-                "type": "select",
-                "select": {
-                    "options": [
-                        {"name": name}
-                        for name in igdb_proto.TestDummyEnumTestEnum.__members__
-                        if name != "TESTDUMMY_ENUM_TEST_NULL"
-                    ]
-                },
-            },
-            "Float Value": {"type": "number", "number": {"format": "number"}},
-            "Game": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Integer Array": {
-                "type": "rich_text",
-                "rich_text": {},
-            },  # Stored as a string, will need parsing
-            "Integer Value": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "New Integer Value": {"type": "number", "number": {"format": "number"}},
-            "Private": {"type": "checkbox", "checkbox": {}},
-            "Slug": {"type": "rich_text", "rich_text": {}},
-            "String Array": {
-                "type": "rich_text",
-                "rich_text": {},
-            },  # Stored as a string, will need parsing
-            # "Test Dummies": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(test_dummy_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            # "Test Dummy": {
-            #     "type": "relation",
-            #     "relation": {
-            #         "database_id": str(test_dummy_db_id),
-            #         "type": "single_property",
-            #         "single_property": {},
-            #     },
-            # },
-            "Updated At": {"type": "date", "date": {}},
-            "URL": {"type": "url", "url": {}},
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class TestDummy(IGDBNotionPage[igdb_proto.TestDummy]):
+    schema = TestDummySchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -5611,95 +4135,24 @@ class TestDummy(IGDBNotionPage[igdb_proto.TestDummy]):
         )
 
 
-class Search(IGDBNotionPage[igdb_proto.Search]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema(
-            Character._notional__database,
-            Collection._notional__database,
-            Company._notional__database,
-            Game._notional__database,
-            Platform._notional__database,
-            TestDummy._notional__database,
-            Theme._notional__database,
-        )
+class SearchSchema(uno.Schema, db_title="Searches"):
+    id = PropType.Number("ID")
+    alternative_name = PropType.Text("Alternative Name")
+    character = PropType.Relation("Character", schema=CharacterSchema)
+    collection = PropType.Relation("Collection", schema=CollectionSchema)
+    company = PropType.Relation("Company", schema=CompanySchema)
+    description = PropType.Text("Description")
+    game = PropType.Relation("Game", schema=GameSchema)
+    name = PropType.Title("Name")
+    platform = PropType.Relation("Platform", schema=PlatformSchema)
+    published_at = PropType.Date("Published At")
+    test_dummy = PropType.Relation("TestDummy", schema=TestDummySchema)
+    theme = PropType.Relation("Theme", schema=ThemeSchema)
+    checksum = PropType.Text("Checksum")
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        character_db_id: str | UUID,
-        collection_db_id: str | UUID,
-        company_db_id: str | UUID,
-        game_db_id: str | UUID,
-        platform_db_id: str | UUID,
-        test_dummy_db_id: str | UUID,
-        theme_db_id: str | UUID,
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Alternative Name": {"type": "rich_text", "rich_text": {}},
-            "Character": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(character_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Collection": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(collection_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Company": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(company_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Description": {"type": "rich_text", "rich_text": {}},
-            "Game": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Name": {"type": "title", "title": {}},
-            "Platform": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(platform_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Published At": {"type": "date", "date": {}},
-            "Test Dummy": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(test_dummy_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Theme": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(theme_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Checksum": {"type": "rich_text", "rich_text": {}},
-        }
+
+class Search(IGDBNotionPage[igdb_proto.Search]):
+    schema = SearchSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod

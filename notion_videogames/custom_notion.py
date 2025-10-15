@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Self, cast, override
+from typing import Any, override
+
+import ultimate_notion as uno
+from ultimate_notion import PropType
 
 from notion_videogames import hltb_notion, igdb_notion, igdb_proto, notion, steamspy_notion
-
-if TYPE_CHECKING:
-    from uuid import UUID
-
-    from notional.query import QueryBuilder
 
 
 @dataclass(frozen=True)
@@ -19,202 +17,147 @@ class CustomGame:
     steamspy: steamspy_notion.SteamSpyGame | None = None
 
 
-class CustomGamePage(notion.ConnectablePage[CustomGame]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        # pylint: disable=protected-access
-        return cls._get_notion_schema(
-            igdb_notion.Game._notional__database,
-            hltb_notion.HLTBNotionPage._notional__database,
-            steamspy_notion.SteamSpyNotionPage._notional__database,
-        )
+class CustomGamePageSchema(uno.Schema):
+    name = PropType.Title("Name")
+    owned = PropType.MultiSelect(
+        "Owned",
+        options=[
+            uno.Option("Steam", color="blue"),
+            uno.Option("Switch", color="red"),
+            uno.Option("EA", color="orange"),
+        ],
+    )
+    notes = PropType.Text("Notes")
+    vamos_jogar = PropType.Select("VAMOS JOGAR", options=[])
+    igdb = PropType.Relation("IGDB", schema=igdb_notion.GameSchema)
+    how_long_to_beat = PropType.Relation(
+        "How Long to Beat", schema=hltb_notion.HLTBNotionPageSchema
+    )
+    steam_spy = PropType.Relation("Steam Spy", schema=steamspy_notion.SteamSpyNotionPageSchema)
+    game_type = PropType.Rollup(
+        "Game Type",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.game_type,
+    )
+    game_modes = PropType.Rollup(
+        "Game Modes",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.game_modes,
+    )
+    main_story_h = PropType.Rollup(
+        "Main Story (h)",
+        relation=how_long_to_beat,
+        rollup=hltb_notion.HLTBNotionPageSchema.main_story_hours,
+    )
+    main_extras_h = PropType.Rollup(
+        "Main+Extras (h)",
+        relation=how_long_to_beat,
+        rollup=hltb_notion.HLTBNotionPageSchema.main_plus_hours,
+    )
+    completionist_h = PropType.Rollup(
+        "Completionist (h)",
+        relation=how_long_to_beat,
+        rollup=hltb_notion.HLTBNotionPageSchema.completionist_hours,
+    )
+    steam_rating = PropType.Rollup(
+        "Steam Rating",
+        relation=steam_spy,
+        rollup=steamspy_notion.SteamSpyNotionPageSchema.review_percent,
+    )
+    steam_rating_count = PropType.Rollup(
+        "Steam Rating Count",
+        relation=steam_spy,
+        rollup=steamspy_notion.SteamSpyNotionPageSchema.review_count,
+    )
+    hltb_review_score = PropType.Rollup(
+        "HLTB Review Score",
+        relation=how_long_to_beat,
+        rollup=hltb_notion.HLTBNotionPageSchema.review_score,
+    )
+    hltb_review_count = PropType.Rollup(
+        "HLTB Review Count",
+        relation=how_long_to_beat,
+        rollup=hltb_notion.HLTBNotionPageSchema.review_count,
+    )
+    users_rating = PropType.Rollup(
+        "Users Rating",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.rating,
+    )
+    users_rating_count = PropType.Rollup(
+        "Users Rating Count",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.rating_count,
+    )
+    critic_rating = PropType.Rollup(
+        "Critic Rating",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.aggregated_rating,
+    )
+    critic_rating_count = PropType.Rollup(
+        "Critic Rating Count",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.aggregated_rating_count,
+    )
+    themes = PropType.Rollup(
+        "Themes",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.themes,
+    )
+    genres = PropType.Rollup(
+        "Genres",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.genres,
+    )
+    player_perspectives = PropType.Rollup(
+        "Player Perspectives",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.player_perspectives,
+    )
+    platforms = PropType.Rollup(
+        "Platforms",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.platforms,
+    )
+    steam_genres = PropType.Rollup(
+        "Steam Genres",
+        relation=steam_spy,
+        rollup=steamspy_notion.SteamSpyNotionPageSchema.genres,
+    )
+    steam_tags = PropType.Rollup(
+        "Steam Tags",
+        relation=steam_spy,
+        rollup=steamspy_notion.SteamSpyNotionPageSchema.tags,
+    )
+    steam_languages = PropType.Rollup(
+        "Steam Languages",
+        relation=steam_spy,
+        rollup=steamspy_notion.SteamSpyNotionPageSchema.languages,
+    )
+    first_release_date = PropType.Rollup(
+        "First Release Date",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.first_release_date,
+    )
+    igdb_url = PropType.Rollup(
+        "IGDB URL",
+        relation=igdb,
+        rollup=igdb_notion.GameSchema.url,
+    )
+    howlongtobeat_url = PropType.Rollup(
+        "HowLongToBeat URL",
+        relation=how_long_to_beat,
+        rollup=hltb_notion.HLTBNotionPageSchema.url,
+    )
+    steam_url = PropType.Rollup(
+        "Steam URL",
+        relation=steam_spy,
+        rollup=steamspy_notion.SteamSpyNotionPageSchema.steam_url,
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema(
-        igdb_game_db_id: str | UUID, hltb_game_db_id: str | UUID, steamspy_game_db_id: str | UUID
-    ) -> dict[str, dict[str, Any]]:
-        return {
-            "Name": {"type": "title", "title": {}},
-            "Owned": {
-                "type": "multi_select",
-                "multi_select": {
-                    "options": [
-                        {"name": "Steam", "color": "blue"},
-                        {"name": "Switch", "color": "red"},
-                    ]
-                },
-            },
-            "Category": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Category",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Game Modes": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Game Modes",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Critic Rating": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Aggregated Rating",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Critic Rating Count": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Aggregated Rating Count",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Users Rating": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Rating",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Users Rating Count": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Rating Count",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "HLTB Review Score": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Review Score",
-                    "relation_property_name": "How Long to Beat",
-                    "function": "show_original",
-                },
-            },
-            "HLTB Review Count": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Review Count",
-                    "relation_property_name": "How Long to Beat",
-                    "function": "show_original",
-                },
-            },
-            "Themes": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Themes",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Genres": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Genres",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Player Perspectives": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Player Perspectives",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Platforms": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Platforms",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "Main Story (h)": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Main Story (h)",
-                    "relation_property_name": "How Long to Beat",
-                    "function": "show_original",
-                },
-            },
-            "Main+Extras (h)": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Main+Extras (h)",
-                    "relation_property_name": "How Long to Beat",
-                    "function": "show_original",
-                },
-            },
-            "Completionist (h)": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "Completionist (h)",
-                    "relation_property_name": "How Long to Beat",
-                    "function": "show_original",
-                },
-            },
-            "First Release Date": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "First Release Date",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "IGDB URL": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "URL",
-                    "relation_property_name": "IGDB",
-                    "function": "show_original",
-                },
-            },
-            "HowLongToBeat URL": {
-                "type": "rollup",
-                "rollup": {
-                    "rollup_property_name": "URL",
-                    "relation_property_name": "How Long to Beat",
-                    "function": "show_original",
-                },
-            },
-            "IGDB": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(igdb_game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "How Long to Beat": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(hltb_game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-            "Steam Spy": {
-                "type": "relation",
-                "relation": {
-                    "database_id": str(steamspy_game_db_id),
-                    "type": "single_property",
-                    "single_property": {},
-                },
-            },
-        }
+
+class CustomGamePage(notion.NotionPageType[CustomGame]):
+    schema = CustomGamePageSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -260,15 +203,12 @@ class CustomGamePage(notion.ConnectablePage[CustomGame]):
 
     @override
     @classmethod
-    def retrieve_from_data(cls, data: CustomGame) -> Self | None:
+    def retrieve_from_data(cls, data: CustomGame) -> uno.Page | None:
         igdb_page = igdb_notion.Game.retrieve_or_create_from_data(data.igdb)
-
-        page: Self | None = (
-            cast("QueryBuilder", cls.query())
-            .filter(property="IGDB", relation={"contains": igdb_page.id})
-            .first()
+        return next(
+            iter(cls.schema.get_db().query.filter(uno.prop("IGDB").contains(igdb_page)).execute()),
+            None,
         )
-        return page
 
     @override
     @classmethod
@@ -276,12 +216,13 @@ class CustomGamePage(notion.ConnectablePage[CustomGame]):
     def retrieve_or_create_from_data(
         cls,
         data: CustomGame,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         if not icon_url and data.igdb.cover.url:
             icon_url = igdb_notion.add_https_scheme(data.igdb.cover.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
 
-        return super().retrieve_or_create_from_data(data, icon_url, cover_url)
+        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)

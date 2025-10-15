@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Self, cast, override
+from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
+import ultimate_notion as uno
 from howlongtobeatpy.HowLongToBeat import HowLongToBeat
 from howlongtobeatpy.JSONResultParser import JSONResultParser
 from pydantic.dataclasses import dataclass
+from ultimate_notion import PropType
 
 from notion_videogames import notion
 
 if TYPE_CHECKING:
     from _typeshed import SupportsKeysAndGetItem
     from howlongtobeatpy.HowLongToBeatEntry import HowLongToBeatEntry
-    from notional.query import QueryBuilder
 
 
 @dataclass(frozen=True)
@@ -67,86 +68,70 @@ class HowLongToBeatGame:  # pylint: disable=too-many-instance-attributes
             **dic,
             profile_devs=profile_devs,
             profile_platforms=profile_platforms,
-            game_image_url=f'{JSONResultParser.IMAGE_URL_PREFIX}{dic["game_image"]}',
-            game_web_link=f'{JSONResultParser.GAME_URL_PREFIX}{dic["game_id"]}',
+            game_image_url=f"{JSONResultParser.IMAGE_URL_PREFIX}{dic['game_image']}",
+            game_web_link=f"{JSONResultParser.GAME_URL_PREFIX}{dic['game_id']}",
         )
 
 
-class HLTBNotionPage(notion.ConnectablePage[HowLongToBeatGame]):
+class HLTBNotionPageSchema(uno.Schema):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    alias = PropType.Text("Alias")
+    type = PropType.Select("Type", options=[])
+    main_story = PropType.Number("Main Story")
+    main_plus = PropType.Number("Main+Extras")
+    completionist = PropType.Number("Completionist")
+    all_styles = PropType.Number("All Styles")
+    main_story_hours = PropType.Formula(
+        "Main Story (h)", formula='round(prop("Main Story") / 36) / 100'
+    )
+    main_plus_hours = PropType.Formula(
+        "Main+Extras (h)", formula='round(prop("Main+Extras") / 36) / 100'
+    )
+    completionist_hours = PropType.Formula(
+        "Completionist (h)", formula='round(prop("Completionist") / 36) / 100'
+    )
+    all_styles_hours = PropType.Formula(
+        "All Styles (h)", formula='round(prop("All Styles") / 36) / 100'
+    )
+    main_story_count = PropType.Number("Main Story Count")
+    main_plus_count = PropType.Number("Main+Extras Count")
+    completionist_count = PropType.Number("Completionist Count")
+    all_styles_count = PropType.Number("All Styles Count")
+    coop = PropType.Number("Co-op")
+    competitive = PropType.Number("Competitive")
+    coop_hours = PropType.Formula("Co-op (h)", formula='round(prop("Co-op") / 36) / 100')
+    competitive_hours = PropType.Formula(
+        "Competitive (h)", formula='round(prop("Competitive") / 36) / 100'
+    )
+    coop_count = PropType.Number("Co-op Count")
+    competitive_count = PropType.Number("Competitive Count")
+    review_score = PropType.Number("Review Score")
+    review_count = PropType.Number("Review Count")
+    count_completed = PropType.Number("Count Completed")
+    count_speedruns = PropType.Number("Count Speedruns")
+    count_backlogs = PropType.Number("Count Backlogs")
+    count_playing = PropType.Number("Count Playing")
+    count_retired = PropType.Number("Count Retired")
+    popularity = PropType.Number("Popularity")
+    steam_id = PropType.Number("Steam ID")
+    release_year = PropType.Number("Release Year")
+    profile_devs = PropType.MultiSelect("Profile Devs", options=[])
+    profile_platforms = PropType.MultiSelect("Profile Platforms", options=[])
+    image_url = PropType.URL("Image URL")
+    url = PropType.URL("URL")
+    similarity = PropType.Number("Similarity")
+    game_name_date = PropType.Number("Game Name Date")
+    comp_lvl_combine = PropType.Number("comp_lvl_combine")
+    comp_lvl_sp = PropType.Number("comp_lvl_sp")
+    comp_lvl_co = PropType.Number("comp_lvl_co")
+    comp_lvl_mp = PropType.Number("comp_lvl_mp")
+    comp_lvl_spd = PropType.Number("comp_lvl_spd")
 
+
+class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame]):
+    schema = HLTBNotionPageSchema  # type: ignore[mutable-override]
     hltb_wrapper: ClassVar[HowLongToBeat] = HowLongToBeat(0)
-
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
-
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Alias": {"type": "rich_text", "rich_text": {}},
-            "Type": {"type": "select", "select": {"options": []}},
-            "Main Story": {"type": "number", "number": {"format": "number"}},
-            "Main+Extras": {"type": "number", "number": {"format": "number"}},
-            "Completionist": {"type": "number", "number": {"format": "number"}},
-            "All Styles": {"type": "number", "number": {"format": "number"}},
-            "Main Story (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(prop("Main Story") / 36) / 100'},
-            },
-            "Main+Extras (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(prop("Main+Extras") / 36) / 100'},
-            },
-            "Completionist (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(prop("Completionist") / 36) / 100'},
-            },
-            "All Styles (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(prop("All Styles") / 36) / 100'},
-            },
-            "Main Story Count": {"type": "number", "number": {"format": "number"}},
-            "Main+Extras Count": {"type": "number", "number": {"format": "number"}},
-            "Completionist Count": {"type": "number", "number": {"format": "number"}},
-            "All Styles Count": {"type": "number", "number": {"format": "number"}},
-            "Co-op": {"type": "number", "number": {"format": "number"}},
-            "Competitive": {"type": "number", "number": {"format": "number"}},
-            "Co-op (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(prop("Co-op") / 36) / 100'},
-            },
-            "Competitive (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(prop("Competitive") / 36) / 100'},
-            },
-            "Co-op Count": {"type": "number", "number": {"format": "number"}},
-            "Competitive Count": {"type": "number", "number": {"format": "number"}},
-            "Review Score": {"type": "number", "number": {"format": "number"}},
-            "Review Count": {"type": "number", "number": {"format": "number"}},
-            "Count Completed": {"type": "number", "number": {"format": "number"}},
-            "Count Speedruns": {"type": "number", "number": {"format": "number"}},
-            "Count Backlogs": {"type": "number", "number": {"format": "number"}},
-            "Count Playing": {"type": "number", "number": {"format": "number"}},
-            "Count Retired": {"type": "number", "number": {"format": "number"}},
-            "Popularity": {"type": "number", "number": {"format": "number"}},
-            "Steam ID": {"type": "number", "number": {"format": "number"}},
-            "Release Year": {"type": "number", "number": {"format": "number"}},
-            "Profile Devs": {"type": "multi_select", "multi_select": {}},
-            "Profile Platforms": {"type": "multi_select", "multi_select": {}},
-            "Image URL": {"type": "url", "url": {}},
-            "URL": {"type": "url", "url": {}},
-            "Similarity": {"type": "number", "number": {"format": "number"}},
-            "Game Name Date": {"type": "number", "number": {"format": "number"}},
-            "comp_lvl_combine": {"type": "number", "number": {"format": "number"}},
-            "comp_lvl_sp": {"type": "number", "number": {"format": "number"}},
-            "comp_lvl_co": {"type": "number", "number": {"format": "number"}},
-            "comp_lvl_mp": {"type": "number", "number": {"format": "number"}},
-            "comp_lvl_spd": {"type": "number", "number": {"format": "number"}},
-        }
 
     @override
     @staticmethod
@@ -193,16 +178,14 @@ class HLTBNotionPage(notion.ConnectablePage[HowLongToBeatGame]):
 
     @override
     @classmethod
-    def retrieve_from_data(cls, data: HowLongToBeatGame) -> Self | None:
+    def retrieve_from_data(cls, data: HowLongToBeatGame) -> uno.Page | None:
         if not hasattr(data, "game_id"):
-            raise ValueError(f"{data!r} has no 'game_id' attribute")
+            msg = f"{data!r} has no 'game_id' attribute"
+            raise ValueError(msg)
 
-        page: Self | None = (
-            cast("QueryBuilder", cls.query())
-            .filter(property="ID", number={"equals": data.game_id})
-            .first()
+        return next(
+            iter(cls.schema.get_db().query.filter(uno.prop("ID") == data.game_id).execute()), None
         )
-        return page
 
     @override
     @classmethod
@@ -210,11 +193,14 @@ class HLTBNotionPage(notion.ConnectablePage[HowLongToBeatGame]):
     def retrieve_or_create_from_data(
         cls,
         data: HowLongToBeatGame,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         return super().retrieve_or_create_from_data(
-            data, icon_url or data.game_image_url, cover_url or data.game_image_url
+            data,
+            icon_url=icon_url or data.game_image_url,
+            cover_url=cover_url or data.game_image_url,
         )
 
     @classmethod

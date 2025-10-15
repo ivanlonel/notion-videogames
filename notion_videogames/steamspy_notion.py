@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Self, cast, override
+from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
 import requests
+import ultimate_notion as uno
 import urllib3
 from pydantic.dataclasses import dataclass
+from ultimate_notion import PropType
 
 from notion_videogames import notion
 
 if TYPE_CHECKING:
     from _typeshed import SupportsKeysAndGetItem
-    from notional.query import QueryBuilder
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -96,68 +97,64 @@ class SteamSpySession(requests.Session):
 
         logger.info("Steam Spy appdetails response for appid %d: %d", app_id, response.status_code)
 
-        return SteamSpyGame.from_dict(response.json()) if response.ok else None
+        if response.ok:
+            try:
+                json = response.json()
+            except requests.exceptions.JSONDecodeError:
+                logger.exception("Failed to decode JSON response for appid %d", app_id)
+                return None
+        else:
+            logger.error("Non-OK response for appid %d: %d", app_id, response.status_code)
+            return None
+
+        return SteamSpyGame.from_dict(json)
 
 
-class SteamSpyNotionPage(notion.ConnectablePage[SteamSpyGame]):
-    @override
-    @classmethod
-    def get_notion_schema(cls) -> dict[str, dict[str, Any]]:
-        return cls._get_notion_schema()
+class SteamSpyNotionPageSchema(uno.Schema):
+    id = PropType.Number("ID")
+    name = PropType.Title("Name")
+    developer = PropType.Text("Developer")
+    publisher = PropType.Text("Publisher")
+    score_rank = PropType.Number("Score Rank")
+    positive = PropType.Number("Positive")
+    negative = PropType.Number("Negative")
+    userscore = PropType.Number("User Score")
+    owners = PropType.Text("Owners")
+    average_forever = PropType.Number("Average Forever")
+    average_2weeks = PropType.Number("Average 2 Weeks")
+    median_forever = PropType.Number("Median Forever")
+    median_2weeks = PropType.Number("Median 2 Weeks")
+    price = PropType.Number("Price")
+    initialprice = PropType.Number("Initial Price")
+    discount = PropType.Number("Discount")
+    ccu = PropType.Number("CCU")
+    languages = PropType.MultiSelect("Languages", options=[])
+    genres = PropType.MultiSelect("Genres", options=[])
+    tags = PropType.MultiSelect("Tags", options=[])
+    review_count = PropType.Formula("Review Count", formula='prop("Positive") + prop("Negative")')
+    review_percent = PropType.Formula(
+        "Review Percent",
+        formula='round(100 * prop("Positive") / (prop("Positive") + prop("Negative")))',
+    )
+    average_forever_h = PropType.Formula(
+        "Average Forever (h)", formula='round(100 * prop("Average Forever") / 60) / 100'
+    )
+    average_2weeks_h = PropType.Formula(
+        "Average 2 Weeks (h)", formula='round(100 * prop("Average 2 Weeks") / 60) / 100'
+    )
+    median_forever_h = PropType.Formula(
+        "Median Forever (h)", formula='round(100 * prop("Median Forever") / 60) / 100'
+    )
+    median_2weeks_h = PropType.Formula(
+        "Median 2 Weeks (h)", formula='round(100 * prop("Median 2 Weeks") / 60) / 100'
+    )
+    steam_url = PropType.Formula(
+        "Steam URL", formula='concat("https://store.steampowered.com/app/", prop("ID"))'
+    )
 
-    @staticmethod
-    @functools.cache
-    def _get_notion_schema() -> dict[str, dict[str, Any]]:
-        return {
-            "ID": {"type": "number", "number": {"format": "number"}},
-            "Name": {"type": "title", "title": {}},
-            "Developer": {"type": "rich_text", "rich_text": {}},
-            "Publisher": {"type": "rich_text", "rich_text": {}},
-            "Score Rank": {"type": "number", "number": {"format": "number"}},
-            "Positive": {"type": "number", "number": {"format": "number"}},
-            "Negative": {"type": "number", "number": {"format": "number"}},
-            "User Score": {"type": "number", "number": {"format": "number"}},
-            "Owners": {"type": "rich_text", "rich_text": {}},
-            "Average Forever": {"type": "number", "number": {"format": "number"}},
-            "Average 2 Weeks": {"type": "number", "number": {"format": "number"}},
-            "Median Forever": {"type": "number", "number": {"format": "number"}},
-            "Median 2 Weeks": {"type": "number", "number": {"format": "number"}},
-            "Price": {"type": "number", "number": {"format": "number"}},
-            "Initial Price": {"type": "number", "number": {"format": "number"}},
-            "Discount": {"type": "number", "number": {"format": "number"}},
-            "CCU": {"type": "number", "number": {"format": "number"}},
-            "Languages": {"type": "multi_select", "multi_select": {}},
-            "Genres": {"type": "multi_select", "multi_select": {}},
-            "Tags": {"type": "multi_select", "multi_select": {}},
-            "Review Count": {
-                "type": "formula",
-                "formula": {"expression": 'prop("Positive") + prop("Negative")'},
-            },
-            "Review Percent": {
-                "type": "formula",
-                "formula": {
-                    "expression": (
-                        'round(100 * prop("Positive") / (prop("Positive") + prop("Negative")))'
-                    )
-                },
-            },
-            "Average Forever (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(100 * prop("Average Forever") / 60) / 100'},
-            },
-            "Average 2 Weeks (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(100 * prop("Average 2 Weeks") / 60) / 100'},
-            },
-            "Median Forever (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(100 * prop("Median Forever") / 60) / 100'},
-            },
-            "Median 2 Weeks (h)": {
-                "type": "formula",
-                "formula": {"expression": 'round(100 * prop("Median 2 Weeks") / 60) / 100'},
-            },
-        }
+
+class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame]):
+    schema = SteamSpyNotionPageSchema  # type: ignore[mutable-override]
 
     @override
     @staticmethod
@@ -187,16 +184,14 @@ class SteamSpyNotionPage(notion.ConnectablePage[SteamSpyGame]):
 
     @override
     @classmethod
-    def retrieve_from_data(cls, data: SteamSpyGame) -> Self | None:
+    def retrieve_from_data(cls, data: SteamSpyGame) -> uno.Page | None:
         if not hasattr(data, "appid"):
-            raise ValueError(f"{data!r} has no 'appid' attribute")
+            msg = f"{data!r} has no 'appid' attribute"
+            raise ValueError(msg)
 
-        page: Self | None = (
-            cast("QueryBuilder", cls.query())
-            .filter(property="ID", number={"equals": data.appid})
-            .first()
+        return next(
+            iter(cls.schema.get_db().query.filter(uno.prop("ID") == data.appid).execute()), None
         )
-        return page
 
     @override
     @classmethod
@@ -204,12 +199,13 @@ class SteamSpyNotionPage(notion.ConnectablePage[SteamSpyGame]):
     def retrieve_or_create_from_data(
         cls,
         data: SteamSpyGame,
+        *,
         icon_url: str | None = None,
         cover_url: str | None = None,
-    ) -> Self:
+    ) -> uno.Page:
         base_url = "https://shared.cloudflare.steamstatic.com/store_item_assets"
         return super().retrieve_or_create_from_data(
             data,
-            icon_url or f"{base_url}/steam/apps/{data.appid}/logo.png",
-            cover_url or f"{base_url}/steam/apps/{data.appid}/library_hero.jpg",
+            icon_url=icon_url or f"{base_url}/steam/apps/{data.appid}/logo.png",
+            cover_url=cover_url or f"{base_url}/steam/apps/{data.appid}/library_hero.jpg",
         )
