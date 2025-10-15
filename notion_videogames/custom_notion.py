@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
-from typing import Any, override
+from typing import override
 
 import ultimate_notion as uno
-from ultimate_notion import PropType
+from ultimate_notion import PropType, props
 
 from notion_videogames import hltb_notion, igdb_notion, igdb_proto, notion, steamspy_notion
 
@@ -161,44 +161,20 @@ class CustomGamePage(notion.NotionPageType[CustomGame]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: CustomGame) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: CustomGame) -> dict[str, props.PropertyValue]:
         return {
-            "Name": {"title": [{"text": {"content": data.igdb.name}}]},
-            "IGDB": {
-                "relation": [
-                    {"id": str(igdb_notion.Game.retrieve_or_create_from_data(data.igdb).id)}
-                ]
-            },
-            "How Long to Beat": {
-                "relation": (
-                    [
-                        {
-                            "id": str(
-                                hltb_notion.HLTBNotionPage.retrieve_or_create_from_data(
-                                    data.hltb
-                                ).id
-                            )
-                        }
-                    ]
-                    if data.hltb
-                    else []
-                )
-            },
-            "Steam Spy": {
-                "relation": (
-                    [
-                        {
-                            "id": str(
-                                steamspy_notion.SteamSpyNotionPage.retrieve_or_create_from_data(
-                                    data.steamspy
-                                ).id
-                            )
-                        }
-                    ]
-                    if data.steamspy
-                    else []
-                )
-            },
+            "Name": props.Title(data.igdb.name),
+            "IGDB": props.Relations(igdb_notion.Game.retrieve_or_create_from_data(data.igdb)),
+            "How Long to Beat": props.Relations(
+                [hltb_notion.HLTBNotionPage.retrieve_or_create_from_data(data.hltb)]
+                if data.hltb
+                else []
+            ),
+            "Steam Spy": props.Relations(
+                [steamspy_notion.SteamSpyNotionPage.retrieve_or_create_from_data(data.steamspy)]
+                if data.steamspy
+                else []
+            ),
         }
 
     @override

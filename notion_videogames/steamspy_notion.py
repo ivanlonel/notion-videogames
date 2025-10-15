@@ -8,7 +8,7 @@ import requests
 import ultimate_notion as uno
 import urllib3
 from pydantic.dataclasses import dataclass
-from ultimate_notion import PropType
+from ultimate_notion import PropType, props
 
 from notion_videogames import notion
 
@@ -158,28 +158,28 @@ class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: SteamSpyGame) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: SteamSpyGame) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.appid},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Developer": {"rich_text": [{"text": {"content": data.developer}}]},
-            "Publisher": {"rich_text": [{"text": {"content": data.publisher}}]},
-            "Score Rank": {"number": data.score_rank},
-            "Positive": {"number": data.positive},
-            "Negative": {"number": data.negative},
-            "User Score": {"number": data.userscore},
-            "Owners": {"rich_text": [{"text": {"content": data.owners}}]},
-            "Average Forever": {"number": data.average_forever},
-            "Average 2 Weeks": {"number": data.average_2weeks},
-            "Median Forever": {"number": data.median_forever},
-            "Median 2 Weeks": {"number": data.median_2weeks},
-            "Price": {"number": data.price},
-            "Initial Price": {"number": data.initialprice},
-            "Discount": {"number": data.discount},
-            "CCU": {"number": data.ccu},
-            "Languages": {"multi_select": [{"name": lang} for lang in data.languages]},
-            "Genres": {"multi_select": [{"name": genre} for genre in data.genres]},
-            "Tags": {"multi_select": [{"name": tag} for tag in data.tags]},
+            "ID": props.Number(data.appid),
+            "Name": props.Title(data.name),
+            "Developer": props.Text(data.developer),
+            "Publisher": props.Text(data.publisher),
+            "Score Rank": props.Number(data.score_rank),
+            "Positive": props.Number(data.positive),
+            "Negative": props.Number(data.negative),
+            "User Score": props.Number(data.userscore),
+            "Owners": props.Text(data.owners),
+            "Average Forever": props.Number(data.average_forever),
+            "Average 2 Weeks": props.Number(data.average_2weeks),
+            "Median Forever": props.Number(data.median_forever),
+            "Median 2 Weeks": props.Number(data.median_2weeks),
+            "Price": props.Number(data.price),
+            "Initial Price": props.Number(data.initialprice),
+            "Discount": props.Number(data.discount),
+            "CCU": props.Number(data.ccu),
+            "Languages": props.MultiSelect(data.languages),
+            "Genres": props.MultiSelect(data.genres),
+            "Tags": props.MultiSelect(data.tags),
         }
 
     @override

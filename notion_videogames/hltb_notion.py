@@ -7,7 +7,7 @@ import ultimate_notion as uno
 from howlongtobeatpy.HowLongToBeat import HowLongToBeat
 from howlongtobeatpy.JSONResultParser import JSONResultParser
 from pydantic.dataclasses import dataclass
-from ultimate_notion import PropType
+from ultimate_notion import PropType, props
 
 from notion_videogames import notion
 
@@ -135,45 +135,45 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: HowLongToBeatGame) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: HowLongToBeatGame) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.game_id},
-            "Name": {"title": [{"text": {"content": data.game_name}}]},
-            "Alias": {"rich_text": [{"text": {"content": data.game_alias}}]},
-            "Type": {"select": {"name": data.game_type}},
-            "Main Story": {"number": data.comp_main},
-            "Main+Extras": {"number": data.comp_plus},
-            "Completionist": {"number": data.comp_100},
-            "All Styles": {"number": data.comp_all},
-            "Main Story Count": {"number": data.comp_main_count},
-            "Main+Extras Count": {"number": data.comp_plus_count},
-            "Completionist Count": {"number": data.comp_100_count},
-            "All Styles Count": {"number": data.comp_all_count},
-            "Co-op": {"number": data.invested_co},
-            "Competitive": {"number": data.invested_mp},
-            "Co-op Count": {"number": data.invested_co_count},
-            "Competitive Count": {"number": data.invested_mp_count},
-            "Review Score": {"number": data.review_score},
-            "Review Count": {"number": data.count_review},
-            "Count Completed": {"number": data.count_comp},
-            "Count Speedruns": {"number": data.count_speedrun},
-            "Count Backlogs": {"number": data.count_backlog},
-            "Count Playing": {"number": data.count_playing},
-            "Count Retired": {"number": data.count_retired},
-            "Popularity": {"number": data.profile_popular},
-            "Steam ID": {"number": data.profile_steam},
-            "Release Year": {"number": data.release_world},
-            "Profile Devs": {"multi_select": [{"name": dev} for dev in data.profile_devs]},
-            "Profile Platforms": {"multi_select": [{"name": p} for p in data.profile_platforms]},
-            "Image URL": {"url": data.game_image_url},
-            "URL": {"url": data.game_web_link},
-            "Similarity": {"number": data.similarity},
-            "Game Name Date": {"number": data.game_name_date},
-            "comp_lvl_combine": {"number": data.comp_lvl_combine},
-            "comp_lvl_sp": {"number": data.comp_lvl_sp},
-            "comp_lvl_co": {"number": data.comp_lvl_co},
-            "comp_lvl_mp": {"number": data.comp_lvl_mp},
-            "comp_lvl_spd": {"number": data.comp_lvl_spd},
+            "ID": props.Number(data.game_id),
+            "Name": props.Title(data.game_name),
+            "Alias": props.Text(data.game_alias),
+            "Type": props.Select(data.game_type),
+            "Main Story": props.Number(data.comp_main),
+            "Main+Extras": props.Number(data.comp_plus),
+            "Completionist": props.Number(data.comp_100),
+            "All Styles": props.Number(data.comp_all),
+            "Main Story Count": props.Number(data.comp_main_count),
+            "Main+Extras Count": props.Number(data.comp_plus_count),
+            "Completionist Count": props.Number(data.comp_100_count),
+            "All Styles Count": props.Number(data.comp_all_count),
+            "Co-op": props.Number(data.invested_co),
+            "Competitive": props.Number(data.invested_mp),
+            "Co-op Count": props.Number(data.invested_co_count),
+            "Competitive Count": props.Number(data.invested_mp_count),
+            "Review Score": props.Number(data.review_score),
+            "Review Count": props.Number(data.count_review),
+            "Count Completed": props.Number(data.count_comp),
+            "Count Speedruns": props.Number(data.count_speedrun),
+            "Count Backlogs": props.Number(data.count_backlog),
+            "Count Playing": props.Number(data.count_playing),
+            "Count Retired": props.Number(data.count_retired),
+            "Popularity": props.Number(data.profile_popular),
+            "Steam ID": props.Number(data.profile_steam),
+            "Release Year": props.Number(data.release_world),
+            "Profile Devs": props.MultiSelect(data.profile_devs),
+            "Profile Platforms": props.MultiSelect(data.profile_platforms),
+            "Image URL": props.URL(data.game_image_url),
+            "URL": props.URL(data.game_web_link),
+            "Similarity": props.Number(data.similarity),
+            "Game Name Date": props.Number(data.game_name_date),
+            "comp_lvl_combine": props.Number(data.comp_lvl_combine),
+            "comp_lvl_sp": props.Number(data.comp_lvl_sp),
+            "comp_lvl_co": props.Number(data.comp_lvl_co),
+            "comp_lvl_mp": props.Number(data.comp_lvl_mp),
+            "comp_lvl_spd": props.Number(data.comp_lvl_spd),
         }
 
     @override

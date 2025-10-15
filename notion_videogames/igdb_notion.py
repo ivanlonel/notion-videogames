@@ -5,11 +5,11 @@ import functools
 import itertools
 import urllib.parse
 from datetime import datetime, timedelta
-from typing import Any, Final, TypeVar, override
+from typing import Final, TypeVar, override
 
 import betterproto
 import ultimate_notion as uno
-from ultimate_notion import PropType
+from ultimate_notion import PropType, props
 
 from notion_videogames import igdb_proto, notion
 
@@ -63,7 +63,6 @@ class IGDBNotionPage(notion.NotionPageType[T]):
         if not hasattr(data, "id"):
             msg = f"{data!r} has no 'id' attribute"
             raise ValueError(msg)
-
         return next(
             iter(cls.schema.get_db().query.filter(uno.prop("ID") == data.id).execute()), None
         )
@@ -94,13 +93,15 @@ class AgeRatingOrganization(IGDBNotionPage[igdb_proto.AgeRatingOrganization]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.AgeRatingOrganization) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.AgeRatingOrganization,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -123,24 +124,18 @@ class AgeRatingCategory(IGDBNotionPage[igdb_proto.AgeRatingCategory]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.AgeRatingCategory) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.AgeRatingCategory,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Rating": {"title": [{"text": {"content": data.rating}}]},
-            "Organization": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingOrganization.retrieve_or_create_from_data(
-                                data.organization
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Rating": props.Title(data.rating),
+            "Organization": props.Relations(
+                AgeRatingOrganization.retrieve_or_create_from_data(data.organization)
+            ),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -174,16 +169,16 @@ class AgeRatingContentDescriptionType(IGDBNotionPage[igdb_proto.AgeRatingContent
 
     @override
     @staticmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         data: igdb_proto.AgeRatingContentDescriptionType,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Slug": props.Text(data.slug),
+            "Name": props.Title(data.name),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -215,37 +210,21 @@ class AgeRatingContentDescriptionV2(IGDBNotionPage[igdb_proto.AgeRatingContentDe
 
     @override
     @staticmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         data: igdb_proto.AgeRatingContentDescriptionV2,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Description": {"title": [{"text": {"content": data.description}}]},
-            "Organization": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingOrganization.retrieve_or_create_from_data(
-                                data.organization
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Description Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingContentDescriptionType.retrieve_or_create_from_data(
-                                data.description_type
-                            ).id
-                        )
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Description": props.Title(data.description),
+            "Organization": props.Relations(
+                AgeRatingOrganization.retrieve_or_create_from_data(data.organization)
+            ),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "Description Type": props.Relations(
+                AgeRatingContentDescriptionType.retrieve_or_create_from_data(data.description_type)
+            ),
         }
 
     @override
@@ -293,51 +272,27 @@ class AgeRating(IGDBNotionPage[igdb_proto.AgeRating]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.AgeRating) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.AgeRating,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Rating Cover URL": {"url": data.rating_cover_url or None},
-            "Synopsis": {"rich_text": [{"text": {"content": data.synopsis[:MAX_TEXT_LENGTH]}}]},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Organization": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingOrganization.retrieve_or_create_from_data(
-                                data.organization
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Rating Category": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingCategory.retrieve_or_create_from_data(data.rating_category).id
-                        )
-                    }
-                ]
-            },
-            "Rating Content Descriptions": {
-                "relation": [
-                    {
-                        "id": str(
-                            AgeRatingContentDescriptionV2.retrieve_or_create_from_data(descr).id
-                        )
-                    }
+            "ID": props.Number(data.id),
+            "Rating Cover URL": props.URL(data.rating_cover_url or None),
+            "Synopsis": props.Text(data.synopsis[:MAX_TEXT_LENGTH]),
+            "Checksum": props.Text(data.checksum),
+            "Organization": props.Relations(
+                AgeRatingOrganization.retrieve_or_create_from_data(data.organization)
+            ),
+            "Rating Category": props.Relations(
+                AgeRatingCategory.retrieve_or_create_from_data(data.rating_category)
+            ),
+            "Rating Content Descriptions": props.Relations(
+                [
+                    AgeRatingContentDescriptionV2.retrieve_or_create_from_data(descr)
                     for descr in data.rating_content_descriptions
                 ]
-            },
-            "Title": {
-                "title": [
-                    {
-                        "text": {
-                            "content": f"{data.organization.name} - {data.rating_category.rating}"
-                        }
-                    }
-                ]
-            },
+            ),
+            "Title": props.Title(f"{data.organization.name} - {data.rating_category.rating}"),
         }
 
     @override
@@ -371,12 +326,14 @@ class AlternativeName(IGDBNotionPage[igdb_proto.AlternativeName]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.AlternativeName) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.AlternativeName,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Comment": {"rich_text": [{"text": {"content": data.comment[:MAX_TEXT_LENGTH]}}]},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Comment": props.Text(data.comment[:MAX_TEXT_LENGTH]),
+            "Name": props.Title(data.name),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -395,14 +352,16 @@ class ArtworkType(IGDBNotionPage[igdb_proto.ArtworkType]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.ArtworkType) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.ArtworkType,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Slug": props.Text(data.slug),
+            "Name": props.Title(data.name),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -430,22 +389,20 @@ class Artwork(IGDBNotionPage[igdb_proto.Artwork]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Artwork) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Artwork) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Artwork Type": {
-                "relation": [
-                    {"id": str(ArtworkType.retrieve_or_create_from_data(data.artwork_type).id)}
-                ]
-            },
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Alpha Channel": props.Checkbox(data.alpha_channel),
+            "Animated": props.Checkbox(data.animated),
+            "Height": props.Number(data.height),
+            "Image ID": props.Text(data.image_id),
+            "URL": props.URL(data.url or None),
+            "Width": props.Number(data.width),
+            "Checksum": props.Text(data.checksum),
+            "Artwork Type": props.Relations(
+                ArtworkType.retrieve_or_create_from_data(data.artwork_type)
+            ),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -495,17 +452,19 @@ class CompanyLogo(IGDBNotionPage[igdb_proto.CompanyLogo]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CompanyLogo) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.CompanyLogo,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Alpha Channel": props.Checkbox(data.alpha_channel),
+            "Animated": props.Checkbox(data.animated),
+            "Height": props.Number(data.height),
+            "Image ID": props.Text(data.image_id),
+            "URL": props.URL(data.url or None),
+            "Width": props.Number(data.width),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -540,13 +499,15 @@ class CompanyStatus(IGDBNotionPage[igdb_proto.CompanyStatus]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CompanyStatus) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.CompanyStatus,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -566,13 +527,15 @@ class WebsiteType(IGDBNotionPage[igdb_proto.WebsiteType]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.WebsiteType) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.WebsiteType,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Type": {"title": [{"text": {"content": data.type}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Type": props.Title(data.type),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -595,18 +558,16 @@ class CompanyWebsite(IGDBNotionPage[igdb_proto.CompanyWebsite]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CompanyWebsite) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.CompanyWebsite,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Trusted": {"checkbox": data.trusted},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Type": {
-                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
-            },
-            "Title": {
-                "title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]
-            },
+            "ID": props.Number(data.id),
+            "Trusted": props.Checkbox(data.trusted),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
+            "Type": props.Relations(WebsiteType.retrieve_or_create_from_data(data.type)),
+            "Title": props.Title(data.type.type or data.url or str(data.id)),
         }
 
     @override
@@ -644,13 +605,15 @@ class DateFormat(IGDBNotionPage[igdb_proto.DateFormat]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.DateFormat) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.DateFormat,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Format": {"title": [{"text": {"content": data.format}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Format": props.Title(data.format),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -706,49 +669,30 @@ class Company(IGDBNotionPage[igdb_proto.Company]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Company) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Company) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Change Date": {"type": "date", "date": {"start": data.change_date.isoformat()}},
-            "Country": {"number": data.country},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Logo": {
-                "relation": [{"id": str(CompanyLogo.retrieve_or_create_from_data(data.logo).id)}]
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Start Date": {"type": "date", "date": {"start": data.start_date.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Websites": {
-                "relation": [
-                    {"id": str(CompanyWebsite.retrieve_or_create_from_data(site).id)}
-                    for site in data.websites
-                ]
-            },
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Status": {
-                "relation": [
-                    {"id": str(CompanyStatus.retrieve_or_create_from_data(data.status).id)}
-                ]
-            },
-            "Start Date Format": {
-                "relation": [
-                    {"id": str(DateFormat.retrieve_or_create_from_data(data.start_date_format).id)}
-                ]
-            },
-            "Change Date Format": {
-                "relation": [
-                    {
-                        "id": str(
-                            DateFormat.retrieve_or_create_from_data(data.change_date_format).id
-                        )
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Change Date": props.Date(data.change_date.isoformat()),
+            "Country": props.Number(data.country),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Logo": props.Relations(CompanyLogo.retrieve_or_create_from_data(data.logo)),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Start Date": props.Date(data.start_date.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Websites": props.Relations(
+                [CompanyWebsite.retrieve_or_create_from_data(site) for site in data.websites]
+            ),
+            "Checksum": props.Text(data.checksum),
+            "Status": props.Relations(CompanyStatus.retrieve_or_create_from_data(data.status)),
+            "Start Date Format": props.Relations(
+                DateFormat.retrieve_or_create_from_data(data.start_date_format)
+            ),
+            "Change Date Format": props.Relations(
+                DateFormat.retrieve_or_create_from_data(data.change_date_format)
+            ),
         }
 
     @override
@@ -807,17 +751,17 @@ class Cover(IGDBNotionPage[igdb_proto.Cover]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Cover) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Cover) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Alpha Channel": props.Checkbox(data.alpha_channel),
+            "Animated": props.Checkbox(data.animated),
+            "Height": props.Number(data.height),
+            "Image ID": props.Text(data.image_id),
+            "URL": props.URL(data.url or None),
+            "Width": props.Number(data.width),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -854,13 +798,15 @@ class ExternalGameSource(IGDBNotionPage[igdb_proto.ExternalGameSource]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.ExternalGameSource) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.ExternalGameSource,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -880,13 +826,15 @@ class GameReleaseFormat(IGDBNotionPage[igdb_proto.GameReleaseFormat]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameReleaseFormat) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.GameReleaseFormat,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Format": {"title": [{"text": {"content": data.format}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Format": props.Title(data.format),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -903,12 +851,14 @@ class PlatformFamily(IGDBNotionPage[igdb_proto.PlatformFamily]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformFamily) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.PlatformFamily,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -933,17 +883,19 @@ class PlatformLogo(IGDBNotionPage[igdb_proto.PlatformLogo]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformLogo) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.PlatformLogo,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Alpha Channel": props.Checkbox(data.alpha_channel),
+            "Animated": props.Checkbox(data.animated),
+            "Height": props.Number(data.height),
+            "Image ID": props.Text(data.image_id),
+            "URL": props.URL(data.url or None),
+            "Width": props.Number(data.width),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -978,13 +930,15 @@ class PlatformType(IGDBNotionPage[igdb_proto.PlatformType]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformType) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.PlatformType,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1011,19 +965,17 @@ class PlatformVersionCompany(IGDBNotionPage[igdb_proto.PlatformVersionCompany]):
 
     @override
     @staticmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         data: igdb_proto.PlatformVersionCompany,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Comment": {"rich_text": [{"text": {"content": data.comment[:MAX_TEXT_LENGTH]}}]},
-            "Company": {
-                "relation": [{"id": str(Company.retrieve_or_create_from_data(data.company).id)}]
-            },
-            "Developer": {"checkbox": data.developer},
-            "Manufacturer": {"checkbox": data.manufacturer},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": f"{data.company.name} - {data.id}"}}]},
+            "ID": props.Number(data.id),
+            "Comment": props.Text(data.comment[:MAX_TEXT_LENGTH]),
+            "Company": props.Relations(Company.retrieve_or_create_from_data(data.company)),
+            "Developer": props.Checkbox(data.developer),
+            "Manufacturer": props.Checkbox(data.manufacturer),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(f"{data.company.name} - {data.id}"),
         }
 
     @override
@@ -1055,13 +1007,15 @@ class ReleaseDateRegion(IGDBNotionPage[igdb_proto.ReleaseDateRegion]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.ReleaseDateRegion) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.ReleaseDateRegion,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Region": {"title": [{"text": {"content": data.region}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Region": props.Title(data.region),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1096,33 +1050,25 @@ class PlatformVersionReleaseDate(IGDBNotionPage[igdb_proto.PlatformVersionReleas
 
     @override
     @staticmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         data: igdb_proto.PlatformVersionReleaseDate,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Date": {"type": "date", "date": {"start": data.date.isoformat()}},
-            "Human": {"rich_text": [{"text": {"content": data.human}}]},
-            "M": {"number": data.m},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Y": {"number": data.y},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Date Format": {
-                "relation": [
-                    {"id": str(DateFormat.retrieve_or_create_from_data(data.date_format).id)}
-                ]
-            },
-            "Release Region": {
-                "relation": [
-                    {
-                        "id": str(
-                            ReleaseDateRegion.retrieve_or_create_from_data(data.release_region).id
-                        )
-                    }
-                ]
-            },
-            "Title": {"title": [{"text": {"content": f"{data.y}/{data.m}"}}]},
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Date": props.Date(data.date.isoformat()),
+            "Human": props.Text(data.human),
+            "M": props.Number(data.m),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Y": props.Number(data.y),
+            "Checksum": props.Text(data.checksum),
+            "Date Format": props.Relations(
+                DateFormat.retrieve_or_create_from_data(data.date_format)
+            ),
+            "Release Region": props.Relations(
+                ReleaseDateRegion.retrieve_or_create_from_data(data.release_region)
+            ),
+            "Title": props.Title(f"{data.y}/{data.m}"),
         }
 
     @override
@@ -1183,58 +1129,44 @@ class PlatformVersion(IGDBNotionPage[igdb_proto.PlatformVersion]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformVersion) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.PlatformVersion,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Companies": {
-                "relation": [
-                    {"id": str(PlatformVersionCompany.retrieve_or_create_from_data(company).id)}
+            "ID": props.Number(data.id),
+            "Companies": props.Relations(
+                [
+                    PlatformVersionCompany.retrieve_or_create_from_data(company)
                     for company in data.companies
                 ]
-            },
-            "Connectivity": {"rich_text": [{"text": {"content": data.connectivity}}]},
-            "CPU": {"rich_text": [{"text": {"content": data.cpu}}]},
-            "Graphics": {"rich_text": [{"text": {"content": data.graphics}}]},
-            "Main Manufacturer": {
-                "relation": [
-                    {
-                        "id": str(
-                            PlatformVersionCompany.retrieve_or_create_from_data(
-                                data.main_manufacturer
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Media": {"rich_text": [{"text": {"content": data.media}}]},
-            "Memory": {"rich_text": [{"text": {"content": data.memory}}]},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "OS": {"rich_text": [{"text": {"content": data.os}}]},
-            "Output": {"rich_text": [{"text": {"content": data.output}}]},
-            "Platform Logo": {
-                "relation": [
-                    {"id": str(PlatformLogo.retrieve_or_create_from_data(data.platform_logo).id)}
-                ]
-            },
-            "Release Dates": {
-                "relation": [
-                    {
-                        "id": str(
-                            PlatformVersionReleaseDate.retrieve_or_create_from_data(
-                                release_date
-                            ).id
-                        )
-                    }
+            ),
+            "Connectivity": props.Text(data.connectivity),
+            "CPU": props.Text(data.cpu),
+            "Graphics": props.Text(data.graphics),
+            "Main Manufacturer": props.Relations(
+                PlatformVersionCompany.retrieve_or_create_from_data(data.main_manufacturer)
+            ),
+            "Media": props.Text(data.media),
+            "Memory": props.Text(data.memory),
+            "Name": props.Title(data.name),
+            "OS": props.Text(data.os),
+            "Output": props.Text(data.output),
+            "Platform Logo": props.Relations(
+                PlatformLogo.retrieve_or_create_from_data(data.platform_logo)
+            ),
+            "Release Dates": props.Relations(
+                [
+                    PlatformVersionReleaseDate.retrieve_or_create_from_data(release_date)
                     for release_date in data.platform_version_release_dates
                 ]
-            },
-            "Resolutions": {"rich_text": [{"text": {"content": data.resolutions}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Sound": {"rich_text": [{"text": {"content": data.sound}}]},
-            "Storage": {"rich_text": [{"text": {"content": data.storage}}]},
-            "Summary": {"rich_text": [{"text": {"content": data.summary[:MAX_TEXT_LENGTH]}}]},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            ),
+            "Resolutions": props.Text(data.resolutions),
+            "Slug": props.Text(data.slug),
+            "Sound": props.Text(data.sound),
+            "Storage": props.Text(data.storage),
+            "Summary": props.Text(data.summary[:MAX_TEXT_LENGTH]),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -1291,18 +1223,16 @@ class PlatformWebsite(IGDBNotionPage[igdb_proto.PlatformWebsite]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.PlatformWebsite) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.PlatformWebsite,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Trusted": {"checkbox": data.trusted},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Type": {
-                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
-            },
-            "Title": {
-                "title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]
-            },
+            "ID": props.Number(data.id),
+            "Trusted": props.Checkbox(data.trusted),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
+            "Type": props.Relations(WebsiteType.retrieve_or_create_from_data(data.type)),
+            "Title": props.Title(data.type.type or data.url or str(data.id)),
         }
 
     @override
@@ -1366,50 +1296,34 @@ class Platform(IGDBNotionPage[igdb_proto.Platform]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Platform) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Platform) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Abbreviation": {"rich_text": [{"text": {"content": data.abbreviation}}]},
-            "Alternative Name": {"rich_text": [{"text": {"content": data.alternative_name}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Generation": {"number": data.generation},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Platform Logo": {
-                "relation": [
-                    {"id": str(PlatformLogo.retrieve_or_create_from_data(data.platform_logo).id)}
-                ]
-            },
-            "Platform Family": {
-                "relation": [
-                    {
-                        "id": str(
-                            PlatformFamily.retrieve_or_create_from_data(data.platform_family).id
-                        )
-                    }
-                ]
-            },
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Summary": {"rich_text": [{"text": {"content": data.summary[:MAX_TEXT_LENGTH]}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Versions": {
-                "relation": [
-                    {"id": str(PlatformVersion.retrieve_or_create_from_data(ver).id)}
-                    for ver in data.versions
-                ]
-            },
-            "Websites": {
-                "relation": [
-                    {"id": str(PlatformWebsite.retrieve_or_create_from_data(ws).id)}
-                    for ws in data.websites
-                ]
-            },
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Platform Type": {
-                "relation": [
-                    {"id": str(PlatformType.retrieve_or_create_from_data(data.platform_type).id)}
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Abbreviation": props.Text(data.abbreviation),
+            "Alternative Name": props.Text(data.alternative_name),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Generation": props.Number(data.generation),
+            "Name": props.Title(data.name),
+            "Platform Logo": props.Relations(
+                PlatformLogo.retrieve_or_create_from_data(data.platform_logo)
+            ),
+            "Platform Family": props.Relations(
+                PlatformFamily.retrieve_or_create_from_data(data.platform_family)
+            ),
+            "Slug": props.Text(data.slug),
+            "Summary": props.Text(data.summary[:MAX_TEXT_LENGTH]),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Versions": props.Relations(
+                [PlatformVersion.retrieve_or_create_from_data(ver) for ver in data.versions]
+            ),
+            "Websites": props.Relations(
+                [PlatformWebsite.retrieve_or_create_from_data(ws) for ws in data.websites]
+            ),
+            "Checksum": props.Text(data.checksum),
+            "Platform Type": props.Relations(
+                PlatformType.retrieve_or_create_from_data(data.platform_type)
+            ),
         }
 
     @override
@@ -1479,42 +1393,26 @@ class ExternalGame(IGDBNotionPage[igdb_proto.ExternalGame]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.ExternalGame) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.ExternalGame,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "UID": {"rich_text": [{"text": {"content": data.uid}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Year": {"number": data.year},
-            "Platform": {
-                "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
-            },
-            # "Countries": {"multi_select": [{"name":str(country)} for country in data.countries]},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "External Game Source": {
-                "relation": [
-                    {
-                        "id": str(
-                            ExternalGameSource.retrieve_or_create_from_data(
-                                data.external_game_source
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Game Release Format": {
-                "relation": [
-                    {
-                        "id": str(
-                            GameReleaseFormat.retrieve_or_create_from_data(
-                                data.game_release_format
-                            ).id
-                        )
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Name": props.Title(data.name),
+            "UID": props.Text(data.uid),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Year": props.Number(data.year),
+            "Platform": props.Relations(Platform.retrieve_or_create_from_data(data.platform)),
+            # "Countries": props.MultiSelect([str(country) for country in data.countries]),
+            "Checksum": props.Text(data.checksum),
+            "External Game Source": props.Relations(
+                ExternalGameSource.retrieve_or_create_from_data(data.external_game_source)
+            ),
+            "Game Release Format": props.Relations(
+                GameReleaseFormat.retrieve_or_create_from_data(data.game_release_format)
+            ),
         }
 
     @override
@@ -1549,15 +1447,17 @@ class Franchise(IGDBNotionPage[igdb_proto.Franchise]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Franchise) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.Franchise,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1579,17 +1479,19 @@ class GameEngineLogo(IGDBNotionPage[igdb_proto.GameEngineLogo]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameEngineLogo) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.GameEngineLogo,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Alpha Channel": props.Checkbox(data.alpha_channel),
+            "Animated": props.Checkbox(data.animated),
+            "Height": props.Number(data.height),
+            "Image ID": props.Text(data.image_id),
+            "URL": props.URL(data.url or None),
+            "Width": props.Number(data.width),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -1642,35 +1544,25 @@ class GameEngine(IGDBNotionPage[igdb_proto.GameEngine]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameEngine) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.GameEngine,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Companies": {
-                "relation": [
-                    {"id": str(Company.retrieve_or_create_from_data(comp).id)}
-                    for comp in data.companies
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Logo": {
-                "relation": [
-                    {"id": str(GameEngineLogo.retrieve_or_create_from_data(data.logo).id)}
-                ]
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Platforms": {
-                "relation": [
-                    {"id": str(Platform.retrieve_or_create_from_data(platf).id)}
-                    for platf in data.platforms
-                ]
-            },
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Companies": props.Relations(
+                [Company.retrieve_or_create_from_data(comp) for comp in data.companies]
+            ),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Logo": props.Relations(GameEngineLogo.retrieve_or_create_from_data(data.logo)),
+            "Name": props.Title(data.name),
+            "Platforms": props.Relations(
+                [Platform.retrieve_or_create_from_data(platf) for platf in data.platforms]
+            ),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -1720,15 +1612,15 @@ class Region(IGDBNotionPage[igdb_proto.Region]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Region) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Region) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Category": {"rich_text": [{"text": {"content": data.category}}]},
-            "Identifier": {"rich_text": [{"text": {"content": data.identifier}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Category": props.Text(data.category),
+            "Identifier": props.Text(data.identifier),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1757,19 +1649,17 @@ class GameLocalization(IGDBNotionPage[igdb_proto.GameLocalization]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameLocalization) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.GameLocalization,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Cover": {
-                "relation": [{"id": str(Cover.retrieve_or_create_from_data(data.cover).id)}]
-            },
-            "Region": {
-                "relation": [{"id": str(Region.retrieve_or_create_from_data(data.region).id)}]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Cover": props.Relations(Cover.retrieve_or_create_from_data(data.cover)),
+            "Region": props.Relations(Region.retrieve_or_create_from_data(data.region)),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -1819,15 +1709,15 @@ class GameMode(IGDBNotionPage[igdb_proto.GameMode]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameMode) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.GameMode) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1845,13 +1735,15 @@ class GameStatus(IGDBNotionPage[igdb_proto.GameStatus]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameStatus) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.GameStatus,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Status": {"title": [{"text": {"content": data.status}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Status": props.Title(data.status),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1869,13 +1761,13 @@ class GameType(IGDBNotionPage[igdb_proto.GameType]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameType) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.GameType) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Type": {"title": [{"text": {"content": data.type}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Type": props.Title(data.type),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1893,12 +1785,14 @@ class GameVideo(IGDBNotionPage[igdb_proto.GameVideo]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameVideo) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.GameVideo,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Video ID": {"rich_text": [{"text": {"content": data.video_id}}]},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Video ID": props.Text(data.video_id),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1918,15 +1812,15 @@ class Genre(IGDBNotionPage[igdb_proto.Genre]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Genre) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Genre) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -1954,20 +1848,20 @@ class InvolvedCompany(IGDBNotionPage[igdb_proto.InvolvedCompany]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.InvolvedCompany) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.InvolvedCompany,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Company": {
-                "relation": [{"id": str(Company.retrieve_or_create_from_data(data.company).id)}]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Developer": {"checkbox": data.developer},
-            "Porting": {"checkbox": data.porting},
-            "Publisher": {"checkbox": data.publisher},
-            "Supporting": {"checkbox": data.supporting},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": data.company.name}}]},
+            "ID": props.Number(data.id),
+            "Company": props.Relations(Company.retrieve_or_create_from_data(data.company)),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Developer": props.Checkbox(data.developer),
+            "Porting": props.Checkbox(data.porting),
+            "Publisher": props.Checkbox(data.publisher),
+            "Supporting": props.Checkbox(data.supporting),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(data.company.name),
         }
 
     @override
@@ -2015,15 +1909,15 @@ class Keyword(IGDBNotionPage[igdb_proto.Keyword]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Keyword) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Keyword) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -2043,15 +1937,15 @@ class Language(IGDBNotionPage[igdb_proto.Language]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Language) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Language) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Native Name": {"rich_text": [{"text": {"content": data.native_name}}]},
-            "Locale": {"rich_text": [{"text": {"content": data.locale}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Native Name": props.Text(data.native_name),
+            "Locale": props.Text(data.locale),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -2071,15 +1965,15 @@ class LanguageSupportType(IGDBNotionPage[igdb_proto.LanguageSupportType]):
 
     @override
     @classmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         cls, data: igdb_proto.LanguageSupportType
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -2108,35 +2002,19 @@ class LanguageSupport(IGDBNotionPage[igdb_proto.LanguageSupport]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.LanguageSupport) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.LanguageSupport,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Language": {
-                "relation": [{"id": str(Language.retrieve_or_create_from_data(data.language).id)}]
-            },
-            "Language Support Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            LanguageSupportType.retrieve_or_create_from_data(
-                                data.language_support_type
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {
-                "title": [
-                    {
-                        "text": {
-                            "content": f"{data.language.name} - {data.language_support_type.name}"
-                        }
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Language": props.Relations(Language.retrieve_or_create_from_data(data.language)),
+            "Language Support Type": props.Relations(
+                LanguageSupportType.retrieve_or_create_from_data(data.language_support_type)
+            ),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(f"{data.language.name} - {data.language_support_type.name}"),
         }
 
     @override
@@ -2182,25 +2060,25 @@ class MultiplayerMode(IGDBNotionPage[igdb_proto.MultiplayerMode]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.MultiplayerMode) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.MultiplayerMode,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Campaign Coop": {"checkbox": data.campaigncoop},
-            "Drop In": {"checkbox": data.dropin},
-            "LAN Coop": {"checkbox": data.lancoop},
-            "Offline Coop": {"checkbox": data.offlinecoop},
-            "Offline Coop Max": {"number": data.offlinecoopmax},
-            "Offline Max": {"number": data.offlinemax},
-            "Online Coop": {"checkbox": data.onlinecoop},
-            "Online Coop Max": {"number": data.onlinecoopmax},
-            "Online Max": {"number": data.onlinemax},
-            "Platform": {
-                "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
-            },
-            "Split Screen": {"checkbox": data.splitscreen},
-            "Split Screen Online": {"checkbox": data.splitscreenonline},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": f"{data.platform.name} - {data.id}"}}]},
+            "ID": props.Number(data.id),
+            "Campaign Coop": props.Checkbox(data.campaigncoop),
+            "Drop In": props.Checkbox(data.dropin),
+            "LAN Coop": props.Checkbox(data.lancoop),
+            "Offline Coop": props.Checkbox(data.offlinecoop),
+            "Offline Coop Max": props.Number(data.offlinecoopmax),
+            "Offline Max": props.Number(data.offlinemax),
+            "Online Coop": props.Checkbox(data.onlinecoop),
+            "Online Coop Max": props.Number(data.onlinecoopmax),
+            "Online Max": props.Number(data.onlinemax),
+            "Platform": props.Relations(Platform.retrieve_or_create_from_data(data.platform)),
+            "Split Screen": props.Checkbox(data.splitscreen),
+            "Split Screen Online": props.Checkbox(data.splitscreenonline),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(f"{data.platform.name} - {data.id}"),
         }
 
     @override
@@ -2232,17 +2110,17 @@ class PlayerPerspective(IGDBNotionPage[igdb_proto.PlayerPerspective]):
 
     @override
     @classmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         cls, data: igdb_proto.PlayerPerspective
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -2261,18 +2139,16 @@ class ReleaseDateStatus(IGDBNotionPage[igdb_proto.ReleaseDateStatus]):
 
     @override
     @classmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         cls, data: igdb_proto.ReleaseDateStatus
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -2316,42 +2192,28 @@ class ReleaseDate(IGDBNotionPage[igdb_proto.ReleaseDate]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.ReleaseDate) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.ReleaseDate,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Date": {"type": "date", "date": {"start": data.date.isoformat()}},
-            "Human": {"rich_text": [{"text": {"content": data.human}}]},
-            "M": {"number": data.m},
-            "Platform": {
-                "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Y": {"number": data.y},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Status": {
-                "relation": [
-                    {"id": str(ReleaseDateStatus.retrieve_or_create_from_data(data.status).id)}
-                ]
-            },
-            "Date Format": {
-                "relation": [
-                    {"id": str(DateFormat.retrieve_or_create_from_data(data.date_format).id)}
-                ]
-            },
-            "Release Region": {
-                "relation": [
-                    {
-                        "id": str(
-                            ReleaseDateRegion.retrieve_or_create_from_data(data.release_region).id
-                        )
-                    }
-                ]
-            },
-            "D": {"number": data.d},
-            "Title": {
-                "title": [{"text": {"content": f"{data.platform.name} - {data.y}/{data.m}"}}]
-            },
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Date": props.Date(data.date.isoformat()),
+            "Human": props.Text(data.human),
+            "M": props.Number(data.m),
+            "Platform": props.Relations(Platform.retrieve_or_create_from_data(data.platform)),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Y": props.Number(data.y),
+            "Checksum": props.Text(data.checksum),
+            "Status": props.Relations(ReleaseDateStatus.retrieve_or_create_from_data(data.status)),
+            "Date Format": props.Relations(
+                DateFormat.retrieve_or_create_from_data(data.date_format)
+            ),
+            "Release Region": props.Relations(
+                ReleaseDateRegion.retrieve_or_create_from_data(data.release_region)
+            ),
+            "D": props.Number(data.d),
+            "Title": props.Title(f"{data.platform.name} - {data.y}/{data.m}"),
         }
 
     @override
@@ -2389,17 +2251,19 @@ class Screenshot(IGDBNotionPage[igdb_proto.Screenshot]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Screenshot) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.Screenshot,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Alpha Channel": props.Checkbox(data.alpha_channel),
+            "Animated": props.Checkbox(data.animated),
+            "Height": props.Number(data.height),
+            "Image ID": props.Text(data.image_id),
+            "URL": props.URL(data.url or None),
+            "Width": props.Number(data.width),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -2436,15 +2300,15 @@ class Theme(IGDBNotionPage[igdb_proto.Theme]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Theme) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Theme) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -2468,18 +2332,14 @@ class Website(IGDBNotionPage[igdb_proto.Website]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Website) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Website) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Trusted": {"checkbox": data.trusted},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Type": {
-                "relation": [{"id": str(WebsiteType.retrieve_or_create_from_data(data.type).id)}]
-            },
-            "Title": {
-                "title": [{"text": {"content": data.type.type or data.url or str(data.id)}}]
-            },
+            "ID": props.Number(data.id),
+            "Trusted": props.Checkbox(data.trusted),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
+            "Type": props.Relations(WebsiteType.retrieve_or_create_from_data(data.type)),
+            "Title": props.Title(data.type.type or data.url or str(data.id)),
         }
 
     @override
@@ -2648,177 +2508,124 @@ class Game(IGDBNotionPage[igdb_proto.Game]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Game) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Game) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Age Ratings": {
-                "relation": [
-                    {"id": str(AgeRating.retrieve_or_create_from_data(ar).id)}
-                    for ar in data.age_ratings
-                ]
-            },
-            "Aggregated Rating": {"number": data.aggregated_rating},
-            "Aggregated Rating Count": {"number": data.aggregated_rating_count},
-            "Alternative Names": {
-                "relation": [
-                    {"id": str(AlternativeName.retrieve_or_create_from_data(name).id)}
+            "ID": props.Number(data.id),
+            "Age Ratings": props.Relations(
+                [AgeRating.retrieve_or_create_from_data(ar) for ar in data.age_ratings]
+            ),
+            "Aggregated Rating": props.Number(data.aggregated_rating),
+            "Aggregated Rating Count": props.Number(data.aggregated_rating_count),
+            "Alternative Names": props.Relations(
+                [
+                    AlternativeName.retrieve_or_create_from_data(name)
                     for name in data.alternative_names
                 ]
-            },
-            "Artworks": {
-                "relation": [
-                    {"id": str(Artwork.retrieve_or_create_from_data(artwork).id)}
-                    for artwork in data.artworks
-                ]
-            },
-            # "Collection": {
-            #     "relation": [
-            #         {"id": str(Collection.retrieve_or_create_from_data(data.collection).id)}
-            #     ]
-            # },
-            "Cover": {
-                "relation": [{"id": str(Cover.retrieve_or_create_from_data(data.cover).id)}]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "External Games": {
-                "relation": [
-                    {"id": str(ExternalGame.retrieve_or_create_from_data(game).id)}
-                    for game in data.external_games
-                ]
-            },
-            "First Release Date": {
-                "type": "date",
-                "date": {"start": data.first_release_date.isoformat()},
-            },
-            # "Follows": {"number": data.follows},
-            # "Franchise": {
-            #     "relation": [
-            #         {"id": str(Franchise.retrieve_or_create_from_data(data.franchise).id)}
-            #     ]
-            # },
-            "Franchises": {
-                "relation": [
-                    {"id": str(Franchise.retrieve_or_create_from_data(franc).id)}
-                    for franc in data.franchises
-                ]
-            },
-            "Game Engines": {
-                "relation": [
-                    {"id": str(GameEngine.retrieve_or_create_from_data(eng).id)}
-                    for eng in data.game_engines
-                ]
-            },
-            "Game Modes": {
-                "relation": [
-                    {"id": str(GameMode.retrieve_or_create_from_data(mode).id)}
-                    for mode in data.game_modes
-                ]
-            },
-            "Genres": {
-                "relation": [
-                    {"id": str(Genre.retrieve_or_create_from_data(genre).id)}
-                    for genre in data.genres
-                ]
-            },
-            "Hypes": {"number": data.hypes},
-            "Involved Companies": {
-                "relation": [
-                    {"id": str(InvolvedCompany.retrieve_or_create_from_data(company).id)}
+            ),
+            "Artworks": props.Relations(
+                [Artwork.retrieve_or_create_from_data(artwork) for artwork in data.artworks]
+            ),
+            # "Collection": props.Relations(
+            #     Collection.retrieve_or_create_from_data(data.collection)
+            # ),
+            "Cover": props.Relations(Cover.retrieve_or_create_from_data(data.cover)),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "External Games": props.Relations(
+                [ExternalGame.retrieve_or_create_from_data(game) for game in data.external_games]
+            ),
+            "First Release Date": props.Date(data.first_release_date.isoformat()),
+            # "Follows": props.Number(data.follows),
+            # "Franchise": props.Relations(Franchise.retrieve_or_create_from_data(data.franchise)),
+            "Franchises": props.Relations(
+                [Franchise.retrieve_or_create_from_data(franc) for franc in data.franchises]
+            ),
+            "Game Engines": props.Relations(
+                [GameEngine.retrieve_or_create_from_data(eng) for eng in data.game_engines]
+            ),
+            "Game Modes": props.Relations(
+                [GameMode.retrieve_or_create_from_data(mode) for mode in data.game_modes]
+            ),
+            "Genres": props.Relations(
+                [Genre.retrieve_or_create_from_data(genre) for genre in data.genres]
+            ),
+            "Hypes": props.Number(data.hypes),
+            "Involved Companies": props.Relations(
+                [
+                    InvolvedCompany.retrieve_or_create_from_data(company)
                     for company in data.involved_companies
                 ]
-            },
-            "Keywords": {
-                "relation": [
-                    {"id": str(Keyword.retrieve_or_create_from_data(keyword).id)}
+            ),
+            "Keywords": props.Relations(
+                [
+                    Keyword.retrieve_or_create_from_data(keyword)
                     for keyword in data.keywords[:MAX_RELATION_PAGES]
                 ]
-            },
-            "Multiplayer Modes": {
-                "relation": [
-                    {"id": str(MultiplayerMode.retrieve_or_create_from_data(mode).id)}
+            ),
+            "Multiplayer Modes": props.Relations(
+                [
+                    MultiplayerMode.retrieve_or_create_from_data(mode)
                     for mode in data.multiplayer_modes
                 ]
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Platforms": {
-                "relation": [
-                    {"id": str(Platform.retrieve_or_create_from_data(platf).id)}
-                    for platf in data.platforms
-                ]
-            },
-            "Player Perspectives": {
-                "relation": [
-                    {"id": str(PlayerPerspective.retrieve_or_create_from_data(perspective).id)}
+            ),
+            "Name": props.Title(data.name),
+            "Platforms": props.Relations(
+                [Platform.retrieve_or_create_from_data(platf) for platf in data.platforms]
+            ),
+            "Player Perspectives": props.Relations(
+                [
+                    PlayerPerspective.retrieve_or_create_from_data(perspective)
                     for perspective in data.player_perspectives
                 ]
-            },
-            "Rating": {"number": data.rating},
-            "Rating Count": {"number": data.rating_count},
-            "Release Dates": {
-                "relation": [
-                    {"id": str(ReleaseDate.retrieve_or_create_from_data(reldate).id)}
+            ),
+            "Rating": props.Number(data.rating),
+            "Rating Count": props.Number(data.rating_count),
+            "Release Dates": props.Relations(
+                [
+                    ReleaseDate.retrieve_or_create_from_data(reldate)
                     for reldate in data.release_dates
                 ]
-            },
-            "Screenshots": {
-                "relation": [
-                    {"id": str(Screenshot.retrieve_or_create_from_data(shot).id)}
-                    for shot in data.screenshots
-                ]
-            },
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Storyline": {"rich_text": [{"text": {"content": data.storyline[:MAX_TEXT_LENGTH]}}]},
-            "Summary": {"rich_text": [{"text": {"content": data.summary}}]},
-            # "Tags": {"multi_select": [{"name": str(tag)} for tag in data.tags]},
-            "Themes": {
-                "relation": [
-                    {"id": str(Theme.retrieve_or_create_from_data(theme).id)}
-                    for theme in data.themes
-                ]
-            },
-            "Total Rating": {"number": data.total_rating},
-            "Total Rating Count": {"number": data.total_rating_count},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Version Title": {"rich_text": [{"text": {"content": data.version_title}}]},
-            "Videos": {
-                "relation": [
-                    {"id": str(GameVideo.retrieve_or_create_from_data(vid).id)}
-                    for vid in data.videos
-                ]
-            },
-            "Websites": {
-                "relation": [
-                    {"id": str(Website.retrieve_or_create_from_data(site).id)}
-                    for site in data.websites
-                ]
-            },
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Language Supports": {
-                "relation": [
-                    {"id": str(LanguageSupport.retrieve_or_create_from_data(lang_support).id)}
+            ),
+            "Screenshots": props.Relations(
+                [Screenshot.retrieve_or_create_from_data(shot) for shot in data.screenshots]
+            ),
+            "Slug": props.Text(data.slug),
+            "Storyline": props.Text(data.storyline[:MAX_TEXT_LENGTH]),
+            "Summary": props.Text(data.summary),
+            # "Tags": props.MultiSelect([str(tag) for tag in data.tags]),
+            "Themes": props.Relations(
+                [Theme.retrieve_or_create_from_data(theme) for theme in data.themes]
+            ),
+            "Total Rating": props.Number(data.total_rating),
+            "Total Rating Count": props.Number(data.total_rating_count),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Version Title": props.Text(data.version_title),
+            "Videos": props.Relations(
+                [GameVideo.retrieve_or_create_from_data(vid) for vid in data.videos]
+            ),
+            "Websites": props.Relations(
+                [Website.retrieve_or_create_from_data(site) for site in data.websites]
+            ),
+            "Checksum": props.Text(data.checksum),
+            "Language Supports": props.Relations(
+                [
+                    LanguageSupport.retrieve_or_create_from_data(lang_support)
                     for lang_support in data.language_supports
                 ]
-            },
-            "Game Localizations": {
-                "relation": [
-                    {"id": str(GameLocalization.retrieve_or_create_from_data(localization).id)}
+            ),
+            "Game Localizations": props.Relations(
+                [
+                    GameLocalization.retrieve_or_create_from_data(localization)
                     for localization in data.game_localizations
                 ]
-            },
-            # "Collections": {
-            #     "relation": [
-            #         {"id": str(Collection.retrieve_or_create_from_data(data.collections).id)}
-            #     ]
-            # },
-            "Game Status": {
-                "relation": [
-                    {"id": str(GameStatus.retrieve_or_create_from_data(data.game_status).id)}
-                ]
-            },
-            "Game Type": {
-                "relation": [{"id": str(GameType.retrieve_or_create_from_data(data.game_type).id)}]
-            },
+            ),
+            # "Collections": props.Relations(
+            #     [Collection.retrieve_or_create_from_data(col) for col in data.collections]
+            # ),
+            "Game Status": props.Relations(
+                GameStatus.retrieve_or_create_from_data(data.game_status)
+            ),
+            "Game Type": props.Relations(GameType.retrieve_or_create_from_data(data.game_type)),
         }
 
     @override
@@ -2911,16 +2718,16 @@ class CollectionType(IGDBNotionPage[igdb_proto.CollectionType]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CollectionType) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.CollectionType,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -2958,25 +2765,21 @@ class Collection(IGDBNotionPage[igdb_proto.Collection]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Collection) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.Collection,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Games": {
-                "relation": [
-                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
-                ]
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Type": {
-                "relation": [
-                    {"id": str(CollectionType.retrieve_or_create_from_data(data.type).id)}
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Games": props.Relations(
+                [Game.retrieve_or_create_from_data(game) for game in data.games]
+            ),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
+            "Type": props.Relations(CollectionType.retrieve_or_create_from_data(data.type)),
         }
 
     @override
@@ -3022,29 +2825,19 @@ class CollectionMembershipType(IGDBNotionPage[igdb_proto.CollectionMembershipTyp
 
     @override
     @staticmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         data: igdb_proto.CollectionMembershipType,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Allowed Collection Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            CollectionType.retrieve_or_create_from_data(
-                                data.allowed_collection_type
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Allowed Collection Type": props.Relations(
+                CollectionType.retrieve_or_create_from_data(data.allowed_collection_type)
+            ),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -3083,39 +2876,22 @@ class CollectionMembership(IGDBNotionPage[igdb_proto.CollectionMembership]):
 
     @override
     @classmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         cls, data: igdb_proto.CollectionMembership
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
-            "Collection": {
-                "relation": [
-                    {"id": str(Collection.retrieve_or_create_from_data(data.collection).id)}
-                ]
-            },
-            "Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            CollectionMembershipType.retrieve_or_create_from_data(data.type).id
-                        )
-                    }
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {
-                "title": [
-                    {
-                        "text": {
-                            "content": f"{data.game.name} - {data.collection.name}"
-                            f" - {data.type.name}"
-                        }
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Game": props.Relations(Game.retrieve_or_create_from_data(data.game)),
+            "Collection": props.Relations(
+                Collection.retrieve_or_create_from_data(data.collection)
+            ),
+            "Type": props.Relations(
+                CollectionMembershipType.retrieve_or_create_from_data(data.type)
+            ),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(f"{data.game.name} - {data.collection.name} - {data.type.name}"),
         }
 
     @override
@@ -3157,38 +2933,22 @@ class CollectionRelationType(IGDBNotionPage[igdb_proto.CollectionRelationType]):
 
     @override
     @staticmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         data: igdb_proto.CollectionRelationType,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Allowed Child Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            CollectionType.retrieve_or_create_from_data(data.allowed_child_type).id
-                        )
-                    }
-                ]
-            },
-            "Allowed Parent Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            CollectionType.retrieve_or_create_from_data(
-                                data.allowed_parent_type
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Allowed Child Type": props.Relations(
+                CollectionType.retrieve_or_create_from_data(data.allowed_child_type)
+            ),
+            "Allowed Parent Type": props.Relations(
+                CollectionType.retrieve_or_create_from_data(data.allowed_parent_type)
+            ),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -3232,39 +2992,26 @@ class CollectionRelation(IGDBNotionPage[igdb_proto.CollectionRelation]):
 
     @override
     @classmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         cls, data: igdb_proto.CollectionRelation
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Child Collection": {
-                "relation": [
-                    {"id": str(Collection.retrieve_or_create_from_data(data.child_collection).id)}
-                ]
-            },
-            "Parent Collection": {
-                "relation": [
-                    {"id": str(Collection.retrieve_or_create_from_data(data.parent_collection).id)}
-                ]
-            },
-            "Type": {
-                "relation": [
-                    {"id": str(CollectionRelationType.retrieve_or_create_from_data(data.type).id)}
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {
-                "title": [
-                    {
-                        "text": {
-                            "content": f"{data.parent_collection.name}"
-                            f" - {data.child_collection.name} - {data.type.name}"
-                        }
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Child Collection": props.Relations(
+                Collection.retrieve_or_create_from_data(data.child_collection)
+            ),
+            "Parent Collection": props.Relations(
+                Collection.retrieve_or_create_from_data(data.parent_collection)
+            ),
+            "Type": props.Relations(
+                CollectionRelationType.retrieve_or_create_from_data(data.type)
+            ),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(
+                f"{data.parent_collection.name} - {data.child_collection.name} - {data.type.name}"
+            ),
         }
 
     @override
@@ -3299,18 +3046,20 @@ class GameTimeToBeat(IGDBNotionPage[igdb_proto.GameTimeToBeat]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameTimeToBeat) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.GameTimeToBeat,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Game ID": {"number": data.game_id},
-            "Hastily": {"number": data.hastily},
-            "Normally": {"number": data.normally},
-            "Completely": {"number": data.completely},
-            "Count": {"number": data.count},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Game ID": props.Number(data.game_id),
+            "Hastily": props.Number(data.hastily),
+            "Normally": props.Number(data.normally),
+            "Completely": props.Number(data.completely),
+            "Count": props.Number(data.count),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
 
@@ -3338,23 +3087,16 @@ class GameVersionFeatureValue(IGDBNotionPage[igdb_proto.GameVersionFeatureValue]
 
     @override
     @staticmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         data: igdb_proto.GameVersionFeatureValue,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
-            "Included Feature": {
-                "type": "select",
-                "select": {"name": data.included_feature.name},
-            },
-            "Note": {"rich_text": [{"text": {"content": data.note[:MAX_TEXT_LENGTH]}}]},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Name": {
-                "title": [
-                    {"text": {"content": f"{data.game.name} - {data.included_feature.name}"}}
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Game": props.Relations(Game.retrieve_or_create_from_data(data.game)),
+            "Included Feature": props.Select(data.included_feature.name or ""),
+            "Note": props.Text(data.note[:MAX_TEXT_LENGTH]),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(f"{data.game.name} - {data.included_feature.name}"),
         }
 
     @override
@@ -3394,24 +3136,22 @@ class GameVersionFeature(IGDBNotionPage[igdb_proto.GameVersionFeature]):
 
     @override
     @classmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         cls, data: igdb_proto.GameVersionFeature
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Category": {"type": "select", "select": {"name": data.category.name}},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Position": {"number": data.position},
-            "Title": {"title": [{"text": {"content": data.title}}]},
-            "Values": {
-                "relation": [
-                    {"id": str(GameVersionFeatureValue.retrieve_or_create_from_data(value).id)}
+            "ID": props.Number(data.id),
+            "Category": props.Select(data.category.name or ""),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Position": props.Number(data.position),
+            "Title": props.Title(data.title),
+            "Values": props.Relations(
+                [
+                    GameVersionFeatureValue.retrieve_or_create_from_data(value)
                     for value in data.values
                 ]
-            },
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            ),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -3447,26 +3187,23 @@ class GameVersion(IGDBNotionPage[igdb_proto.GameVersion]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.GameVersion) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.GameVersion,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Features": {
-                "relation": [
-                    {"id": str(GameVersionFeature.retrieve_or_create_from_data(feat).id)}
-                    for feat in data.features
-                ]
-            },
-            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
-            "Games": {
-                "relation": [
-                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
-                ]
-            },
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Features": props.Relations(
+                [GameVersionFeature.retrieve_or_create_from_data(feat) for feat in data.features]
+            ),
+            "Game": props.Relations(Game.retrieve_or_create_from_data(data.game)),
+            "Games": props.Relations(
+                [Game.retrieve_or_create_from_data(game) for game in data.games]
+            ),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -3497,13 +3234,15 @@ class CharacterGender(IGDBNotionPage[igdb_proto.CharacterGender]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CharacterGender) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.CharacterGender,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -3525,17 +3264,19 @@ class CharacterMugShot(IGDBNotionPage[igdb_proto.CharacterMugShot]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CharacterMugShot) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.CharacterMugShot,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Alpha Channel": props.Checkbox(data.alpha_channel),
+            "Animated": props.Checkbox(data.animated),
+            "Height": props.Number(data.height),
+            "Image ID": props.Text(data.image_id),
+            "URL": props.URL(data.url or None),
+            "Width": props.Number(data.width),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -3570,13 +3311,15 @@ class CharacterSpecie(IGDBNotionPage[igdb_proto.CharacterSpecie]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.CharacterSpecie) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.CharacterSpecie,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -3614,48 +3357,32 @@ class Character(IGDBNotionPage[igdb_proto.Character]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Character) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.Character,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "AKAs": {"multi_select": [{"name": aka} for aka in data.akas]},
-            "Country Name": {"rich_text": [{"text": {"content": data.country_name}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Games": {
-                "relation": [
-                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
-                ]
-            },
-            "Mug Shot": {
-                "relation": [
-                    {"id": str(CharacterMugShot.retrieve_or_create_from_data(data.mug_shot).id)}
-                ]
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Character Gender": {
-                "relation": [
-                    {
-                        "id": str(
-                            CharacterGender.retrieve_or_create_from_data(data.character_gender).id
-                        )
-                    }
-                ]
-            },
-            "Character Species": {
-                "relation": [
-                    {
-                        "id": str(
-                            CharacterSpecie.retrieve_or_create_from_data(data.character_species).id
-                        )
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "AKAs": props.MultiSelect(data.akas),
+            "Country Name": props.Text(data.country_name),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Games": props.Relations(
+                [Game.retrieve_or_create_from_data(game) for game in data.games]
+            ),
+            "Mug Shot": props.Relations(
+                CharacterMugShot.retrieve_or_create_from_data(data.mug_shot)
+            ),
+            "Name": props.Title(data.name),
+            "Slug": props.Text(data.slug),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
+            "Character Gender": props.Relations(
+                CharacterGender.retrieve_or_create_from_data(data.character_gender)
+            ),
+            "Character Species": props.Relations(
+                CharacterSpecie.retrieve_or_create_from_data(data.character_species)
+            ),
         }
 
     @override
@@ -3709,19 +3436,21 @@ class EventLogo(IGDBNotionPage[igdb_proto.EventLogo]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.EventLogo) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.EventLogo,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alpha Channel": {"checkbox": data.alpha_channel},
-            "Animated": {"checkbox": data.animated},
-            "Height": {"number": data.height},
-            "Image ID": {"rich_text": [{"text": {"content": data.image_id}}]},
-            "URL": {"url": data.url or None},
-            "Width": {"number": data.width},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": str(data.id)}}]},
+            "ID": props.Number(data.id),
+            "Alpha Channel": props.Checkbox(data.alpha_channel),
+            "Animated": props.Checkbox(data.animated),
+            "Height": props.Number(data.height),
+            "Image ID": props.Text(data.image_id),
+            "URL": props.URL(data.url or None),
+            "Width": props.Number(data.width),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(str(data.id)),
         }
 
     @override
@@ -3757,13 +3486,15 @@ class NetworkType(IGDBNotionPage[igdb_proto.NetworkType]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.NetworkType) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.NetworkType,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
 
@@ -3788,19 +3519,19 @@ class EventNetwork(IGDBNotionPage[igdb_proto.EventNetwork]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.EventNetwork) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.EventNetwork,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "URL": {"url": data.url or None},
-            "Network Type": {
-                "relation": [
-                    {"id": str(NetworkType.retrieve_or_create_from_data(data.network_type).id)}
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "Title": {"title": [{"text": {"content": f"{data.network_type.name} - {data.id}"}}]},
+            "ID": props.Number(data.id),
+            "URL": props.URL(data.url or None),
+            "Network Type": props.Relations(
+                NetworkType.retrieve_or_create_from_data(data.network_type)
+            ),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "Title": props.Title(f"{data.network_type.name} - {data.id}"),
         }
 
     @override
@@ -3847,43 +3578,29 @@ class Event(IGDBNotionPage[igdb_proto.Event]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Event) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Event) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "Event Logo": {
-                "relation": [
-                    {"id": str(EventLogo.retrieve_or_create_from_data(data.event_logo).id)}
-                ]
-            },
-            "Start Time": {"type": "date", "date": {"start": data.start_time.isoformat()}},
-            "Time Zone": {"rich_text": [{"text": {"content": data.time_zone}}]},
-            "End Time": {"type": "date", "date": {"start": data.end_time.isoformat()}},
-            "Live Stream URL": {"url": data.live_stream_url},
-            "Games": {
-                "relation": [
-                    {"id": str(Game.retrieve_or_create_from_data(game).id)} for game in data.games
-                ]
-            },
-            "Videos": {
-                "relation": [
-                    {"id": str(GameVideo.retrieve_or_create_from_data(vid).id)}
-                    for vid in data.videos
-                ]
-            },
-            "Event Networks": {
-                "relation": [
-                    {"id": str(EventNetwork.retrieve_or_create_from_data(n).id)}
-                    for n in data.event_networks
-                ]
-            },
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Slug": props.Text(data.slug),
+            "Event Logo": props.Relations(EventLogo.retrieve_or_create_from_data(data.event_logo)),
+            "Start Time": props.Date(data.start_time.isoformat()),
+            "Time Zone": props.Text(data.time_zone),
+            "End Time": props.Date(data.end_time.isoformat()),
+            "Live Stream URL": props.URL(data.live_stream_url),
+            "Games": props.Relations(
+                [Game.retrieve_or_create_from_data(game) for game in data.games]
+            ),
+            "Videos": props.Relations(
+                [GameVideo.retrieve_or_create_from_data(vid) for vid in data.videos]
+            ),
+            "Event Networks": props.Relations(
+                [EventNetwork.retrieve_or_create_from_data(n) for n in data.event_networks]
+            ),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -3937,32 +3654,18 @@ class PopularityType(IGDBNotionPage[igdb_proto.PopularityType]):
 
     @override
     @classmethod
-    def get_notion_properties(cls, data: igdb_proto.PopularityType) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        cls, data: igdb_proto.PopularityType
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Popularity Source": {
-                "type": "select",
-                "select": (
-                    {"name": data.popularity_source.name}
-                    if data.popularity_source.name != "POPULARITYSOURCE_POPULARITY_SOURCE_NULL"
-                    else None
-                ),
-            },
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "External Popularity Source": {
-                "relation": [
-                    {
-                        "id": str(
-                            ExternalGameSource.retrieve_or_create_from_data(
-                                data.external_popularity_source
-                            ).id
-                        )
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Name": props.Title(data.name),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "External Popularity Source": props.Relations(
+                ExternalGameSource.retrieve_or_create_from_data(data.external_popularity_source)
+            ),
         }
 
     @override
@@ -4001,53 +3704,33 @@ class PopularityPrimitive(IGDBNotionPage[igdb_proto.PopularityPrimitive]):
 
     @override
     @classmethod
-    def get_notion_properties(
+    def get_populated_properties_dict(
         cls, data: igdb_proto.PopularityPrimitive
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Game ID": {"number": data.game_id},
-            "Popularity Type": {
-                "relation": [
-                    {
-                        "id": str(
-                            PopularityType.retrieve_or_create_from_data(data.popularity_type).id
-                        )
-                    }
-                ]
-            },
-            "Value": {"number": data.value},
-            "Calculated At": {"type": "date", "date": {"start": data.calculated_at.isoformat()}},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
-            "External Popularity Source": {
-                "relation": [
-                    {
-                        "id": str(
-                            ExternalGameSource.retrieve_or_create_from_data(
-                                data.external_popularity_source
-                            ).id
-                        )
-                    }
-                ]
-            },
-            "Title": {
-                "title": [
-                    {
-                        "text": {
-                            "content": " - ".join(
-                                part
-                                for part in (
-                                    data.popularity_type.name,
-                                    data.external_popularity_source.name,
-                                )
-                                if part
-                            )
-                        }
-                    }
-                ]
-            },
+            "ID": props.Number(data.id),
+            "Game ID": props.Number(data.game_id),
+            "Popularity Type": props.Relations(
+                PopularityType.retrieve_or_create_from_data(data.popularity_type)
+            ),
+            "Value": props.Number(data.value),
+            "Calculated At": props.Date(data.calculated_at.isoformat()),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "Checksum": props.Text(data.checksum),
+            "External Popularity Source": props.Relations(
+                ExternalGameSource.retrieve_or_create_from_data(data.external_popularity_source)
+            ),
+            "Title": props.Title(
+                " - ".join(
+                    part
+                    for part in (
+                        data.popularity_type.name,
+                        data.external_popularity_source.name,
+                    )
+                    if part
+                )
+            ),
         }
 
     @override
@@ -4069,11 +3752,7 @@ class TestDummySchema(uno.Schema, db_title="Test Dummies"):
     created_at = PropType.Date("Created At")
     enum_test = PropType.Select(
         "Enum Test",
-        options=[
-            uno.Option(name)
-            for name in igdb_proto.TestDummyEnumTestEnum.__members__
-            if name != "TESTDUMMY_ENUM_TEST_NULL"
-        ],
+        options=[uno.Option(name) for name in igdb_proto.TestDummyEnumTestEnum.__members__],
     )
     float_value = PropType.Number("Float Value")
     game = PropType.Relation("Game", schema=GameSchema)
@@ -4096,31 +3775,30 @@ class TestDummy(IGDBNotionPage[igdb_proto.TestDummy]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.TestDummy) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(
+        data: igdb_proto.TestDummy,
+    ) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Bool Value": {"checkbox": data.bool_value},
-            "Created At": {"type": "date", "date": {"start": data.created_at.isoformat()}},
-            "Enum Test": {
-                "type": "select",
-                "select": (
-                    {"name": data.enum_test.name}
-                    if data.enum_test.name != "TESTDUMMY_ENUM_TEST_NULL"
-                    else None
-                ),
-            },
-            "Float Value": {"number": data.float_value},
-            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
-            "Integer Array": {"rich_text": [{"text": {"content": str(data.integer_array)}}]},
-            "Integer Value": {"number": data.integer_value},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "New Integer Value": {"number": data.new_integer_value},
-            "Private": {"checkbox": data.private},
-            "Slug": {"rich_text": [{"text": {"content": data.slug}}]},
-            "String Array": {"rich_text": [{"text": {"content": str(data.string_array)}}]},
-            "Updated At": {"type": "date", "date": {"start": data.updated_at.isoformat()}},
-            "URL": {"url": data.url or None},
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Bool Value": props.Checkbox(data.bool_value),
+            "Created At": props.Date(data.created_at.isoformat()),
+            "Enum Test": props.Select(
+                data.enum_test.name
+                if data.enum_test.name is not None
+                else "TESTDUMMY_ENUM_TEST_NULL"
+            ),
+            "Float Value": props.Number(data.float_value),
+            "Game": props.Relations(Game.retrieve_or_create_from_data(data.game)),
+            "Integer Array": props.Text(str(data.integer_array)),
+            "Integer Value": props.Number(data.integer_value),
+            "Name": props.Title(data.name),
+            "New Integer Value": props.Number(data.new_integer_value),
+            "Private": props.Checkbox(data.private),
+            "Slug": props.Text(data.slug),
+            "String Array": props.Text(str(data.string_array)),
+            "Updated At": props.Date(data.updated_at.isoformat()),
+            "URL": props.URL(data.url or None),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
@@ -4156,44 +3834,23 @@ class Search(IGDBNotionPage[igdb_proto.Search]):
 
     @override
     @staticmethod
-    def get_notion_properties(data: igdb_proto.Search) -> dict[str, dict[str, Any]]:
+    def get_populated_properties_dict(data: igdb_proto.Search) -> dict[str, props.PropertyValue]:
         return {
-            "ID": {"number": data.id},
-            "Alternative Name": {"rich_text": [{"text": {"content": data.alternative_name}}]},
-            "Character": {
-                "relation": [
-                    {"id": str(Character.retrieve_or_create_from_data(data.character).id)}
-                ]
-            },
-            "Collection": {
-                "relation": [
-                    {"id": str(Collection.retrieve_or_create_from_data(data.collection).id)}
-                ]
-            },
-            "Company": {
-                "relation": [{"id": str(Company.retrieve_or_create_from_data(data.company).id)}]
-            },
-            "Description": {
-                "rich_text": [{"text": {"content": data.description[:MAX_TEXT_LENGTH]}}]
-            },
-            "Game": {"relation": [{"id": str(Game.retrieve_or_create_from_data(data.game).id)}]},
-            "Name": {"title": [{"text": {"content": data.name}}]},
-            "Platform": {
-                "relation": [{"id": str(Platform.retrieve_or_create_from_data(data.platform).id)}]
-            },
-            "Published At": {
-                "type": "date",
-                "date": {"start": data.published_at.isoformat()},
-            },
-            "Test Dummy": {
-                "relation": [
-                    {"id": str(TestDummy.retrieve_or_create_from_data(data.test_dummy).id)}
-                ]
-            },
-            "Theme": {
-                "relation": [{"id": str(Theme.retrieve_or_create_from_data(data.theme).id)}]
-            },
-            "Checksum": {"rich_text": [{"text": {"content": data.checksum}}]},
+            "ID": props.Number(data.id),
+            "Alternative Name": props.Text(data.alternative_name),
+            "Character": props.Relations(Character.retrieve_or_create_from_data(data.character)),
+            "Collection": props.Relations(
+                Collection.retrieve_or_create_from_data(data.collection)
+            ),
+            "Company": props.Relations(Company.retrieve_or_create_from_data(data.company)),
+            "Description": props.Text(data.description[:MAX_TEXT_LENGTH]),
+            "Game": props.Relations(Game.retrieve_or_create_from_data(data.game)),
+            "Name": props.Title(data.name),
+            "Platform": props.Relations(Platform.retrieve_or_create_from_data(data.platform)),
+            "Published At": props.Date(data.published_at.isoformat()),
+            "Test Dummy": props.Relations(TestDummy.retrieve_or_create_from_data(data.test_dummy)),
+            "Theme": props.Relations(Theme.retrieve_or_create_from_data(data.theme)),
+            "Checksum": props.Text(data.checksum),
         }
 
     @override
