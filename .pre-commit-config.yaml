@@ -1,8 +1,37 @@
+default_install_hook_types:
+  - pre-commit
+  - post-checkout
+  - post-merge
+  - post-rewrite
+
 repos:
   - repo: meta
     hooks:
       - id: check-hooks-apply
       - id: check-useless-excludes
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.10.12
+    hooks:
+      # - id: uv-lock
+      #   args:
+      #     - --upgrade
+      - id: uv-export
+        files: ^(uv\.lock|requirements\.txt)$
+        args:
+          - --frozen
+          - --no-dev
+          - --output-file=requirements.txt
+      - id: uv-sync
+        always_run: true
+        args:
+          - --locked
+          - --group=dev
+
+  - repo: https://github.com/tsvikas/sync-with-uv
+    rev: v0.5.0
+    hooks:
+      - id: sync-with-uv
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

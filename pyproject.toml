@@ -24,10 +24,13 @@ dependencies = [
   "tenacity~=9.1.4",
   "ultimate-notion~=0.9.6",
 ]
-optional-dependencies.dev = [
-  "bandit~=1.9.4",
-  "black~=26.3.1",
-  "flake8~=7.3.0",
+urls.Repository = "https://github.com/ivanlonel/notion-videogames"
+
+[dependency-groups]
+dev = [
+  "bandit>=1.9.4",
+  "black>=26.3.1",
+  "flake8>=7.3",
   "flake8-2020~=1.8",
   "flake8-absolute-import~=1.0",
   "flake8-annotations~=3.2",
@@ -53,16 +56,15 @@ optional-dependencies.dev = [
   "flake8-type-checking~=3.2",
   "flake8-use-fstring~=1.4",
   "flake8-useless-assert~=0.4",
-  "isort~=8.0.1",
-  "mypy~=1.19.1",
+  "isort>=8.0.1",
+  "mypy>=1.19.1",
   "pep8-naming~=0.15",
   "pre-commit~=4.5",
-  "pylint~=4.0.5",
-  "ruff~=0.15.7",
+  "pylint>=4.0.5",
+  "ruff>=0.15.7",
   "tryceratops~=2.4",
   "types-requests~=2.32",
 ]
-urls.Repository = "https://github.com/ivanlonel/notion-videogames"
 
 [tool.black]
 line-length = 99
