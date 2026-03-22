@@ -77,18 +77,16 @@ exclude = [
 ]
 lint.select = [ "ALL" ]
 lint.ignore = [
-  "COM812",  # Trailing comma missing
-  "D1",      # Missing Docstrings (pydocstyle)
-  "D203",    # Use a blank line to separate the docstring from the class definition
-  "D212",    # Multi-line docstring summary should start at the first line
-  "E203",    # Whitespace before ‘,’, ‘;’, or ‘:’
+  "COM812", # Trailing comma missing
+  "D1",     # Missing Docstrings (pydocstyle)
+  "D203",   # Use a blank line to separate the docstring from the class definition
+  "D212",   # Multi-line docstring summary should start at the first line
+  "E203",   # Whitespace before ‘,’, ‘;’, or ‘:’
   # (Black enforces an equal amount of whitespace around slice operators)
-  "E501",    # Line too long (pycodestyle)
-  "E701",    # Multiple statements on one line (colon)
+  "E501",   # Line too long (pycodestyle)
+  "E701",   # Multiple statements on one line (colon)
   # (Black collapses classes/functions consisting of ... to a single line)
-  "ERA001",  # Found commented-out code
-  "PLR2004", # Magic value used in comparison
-  "SLF001",  # Private member accessed
+  "ERA001", # Found commented-out code
 ]
 lint.flake8-annotations.allow-star-arg-any = true
 lint.mccabe.max-complexity = 15  # default 10  # C901

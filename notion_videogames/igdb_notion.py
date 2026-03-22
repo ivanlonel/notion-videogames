@@ -21,7 +21,7 @@ MAX_TEXT_LENGTH: Final[int] = 2000
 
 
 def _to_datetime(self: betterproto._Timestamp) -> datetime:
-    if self.seconds < 1e12:
+    if self.seconds < 1e12:  # noqa: PLR2004
         offset = timedelta(seconds=self.seconds, microseconds=self.nanos // 1000)
     else:
         offset = timedelta(seconds=self.seconds // 1000, microseconds=self.nanos // 1000000)
@@ -30,7 +30,7 @@ def _to_datetime(self: betterproto._Timestamp) -> datetime:
 
 # Monkeypatch betterproto._Timestamp.to_datetime to deal with timestamps in milliseconds
 # pylint: disable-next=protected-access
-betterproto._Timestamp.to_datetime = _to_datetime  # type: ignore[method-assign]
+betterproto._Timestamp.to_datetime = _to_datetime  # type: ignore[method-assign]  # noqa: SLF001
 
 
 def _hash(self: betterproto.Message) -> int:
