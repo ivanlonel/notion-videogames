@@ -20,7 +20,7 @@ dependencies = [
   "notion-client>=2.5",
   "pydantic>=2.12",
   "python-dotenv~=1.2.2",
-  "requests~=2.32.5",
+  "requests~=2.33.0",
   "tenacity~=9.1.4",
   "ultimate-notion~=0.9.6",
 ]
