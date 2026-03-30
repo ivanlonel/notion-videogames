@@ -4,6 +4,9 @@
     "config:recommended"
   ],
 
+  "timezone": "America/Sao_Paulo",
+  "schedule": ["before 6am on monday"],
+
   // The pep621 and pre-commit managers are not enabled by default.
   // github-actions is enabled by default and listed here for explicitness.
   "enabledManagers": ["github-actions", "pre-commit", "pep621"],
@@ -23,7 +26,23 @@
       // alongside pyproject.toml changes. We disable that here because
       // uv-lock-upgrade runs as a pre-commit hook in the workflow instead.
       "matchManagers": ["pep621"],
-      "updateLockFiles": false
+      "addLabels": ["pep621"],
+      "skipArtifactsUpdate": true
+    },
+    {
+      "matchManagers": ["pre-commit"],
+      "addLabels": ["pre-commit"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "addLabels": ["github-actions"]
+    },
+    {
+      // Group pep621 and pre-commit updates into a single PR so the
+      // pre-commit hook revs and pyproject.toml deps land together.
+      "matchManagers": ["pep621", "pre-commit"],
+      "groupName": "pep621 and pre-commit",
+      "groupSlug": "pep621-pre-commit"
     }
   ]
 }

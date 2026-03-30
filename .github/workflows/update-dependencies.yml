@@ -22,13 +22,14 @@ jobs:
           token: ${{ secrets.RENOVATE_TOKEN }}
 
       # ── Step 1: pre-commit hooks ──────────────────────────────────────────
-      # pre-commit/action manages its own environment; no need to install
-      # uv or pre-commit beforehand.
+      # Only run hooks for pep621 or pre-commit PRs (identified by their
+      # Renovate-assigned labels). github-actions-only PRs skip this section.
 
       # Run the three hooks in the required order.
       # Each is invoked individually so a failure in one doesn't silently
       # skip the others, and the order is guaranteed.
-      - name: pre-commit – uv-lock-upgrade
+      - name: pre-commit – uv-lock
+        if: contains(github.event.pull_request.labels.*.name, 'pep621') || contains(github.event.pull_request.labels.*.name, 'pre-commit')
         uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all-files --verbose --hook-stage manual uv-lock-upgrade
@@ -37,53 +38,29 @@ jobs:
         continue-on-error: true
 
       - name: pre-commit – uv-export
+        if: contains(github.event.pull_request.labels.*.name, 'pep621') || contains(github.event.pull_request.labels.*.name, 'pre-commit')
         uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all-files --verbose uv-export
         continue-on-error: true
 
       - name: pre-commit – sync-with-uv
+        if: contains(github.event.pull_request.labels.*.name, 'pep621') || contains(github.event.pull_request.labels.*.name, 'pre-commit')
         uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all-files --verbose sync-with-uv
         continue-on-error: true
 
       # ── Step 2: Commit any hook-generated changes back to the PR branch ───
-      - name: Build commit message and PR body
-        id: meta
-        run: |
-          # Commit message: list files changed by the hooks
-          CHANGED=$(git diff --name-only | tr '\n' ' ')
-          echo "commit-message=chore(deps): apply post-Renovate hooks to ${CHANGED}" >> "$GITHUB_OUTPUT"
-
-          # PR body: Renovate's original description + git log + changed files
-          RENOVATE_BODY="${{ github.event.pull_request.body }}"
-          GIT_LOG=$(git log origin/${{ github.base_ref }}..HEAD --oneline)
-          DIFF_FILES=$(git diff --name-only | sed 's/^/- /')
-          {
-            echo "body<<EOF"
-            echo "${RENOVATE_BODY}"
-            echo ""
-            echo "---"
-            echo "### Post-Renovate hook changes"
-            echo "**Commits:**"
-            echo "\`\`\`"
-            echo "${GIT_LOG}"
-            echo "\`\`\`"
-            echo "**Files modified by hooks:**"
-            echo "${DIFF_FILES}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
       - name: Commit changes
         id: create-pr
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.RENOVATE_TOKEN }}
           branch: ${{ github.head_ref }}
-          commit-message: ${{ steps.meta.outputs.commit-message }}
-          body: ${{ steps.meta.outputs.body }}
+          commit-message: "chore(deps): apply post-Renovate hooks"
           # Do not open a new PR — push directly to the existing Renovate branch.
+          # title and body are intentionally omitted to preserve Renovate's originals.
           base: ${{ github.base_ref }}
 
       # ── Step 3: Enable auto-merge ─────────────────────────────────────────
