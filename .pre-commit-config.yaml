@@ -162,7 +162,7 @@ repos:
         language: python
         additional_dependencies:
           - betterproto~=2.0.0b7
-          - notion-client~=2.5
+          - notion-client~=3.0
           - pydantic~=2.12
           - python-dotenv~=1.2
           - tenacity~=9.1
