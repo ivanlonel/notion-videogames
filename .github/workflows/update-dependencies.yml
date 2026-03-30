@@ -53,15 +53,10 @@ jobs:
 
       # ── Step 2: Commit any hook-generated changes back to the PR branch ───
       - name: Commit changes
-        id: create-pr
-        uses: peter-evans/create-pull-request@v8
+        id: auto-commit
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          token: ${{ secrets.RENOVATE_TOKEN }}
-          branch: ${{ github.head_ref }}
-          commit-message: "chore(deps): apply post-Renovate hooks"
-          # Do not open a new PR — push directly to the existing Renovate branch.
-          # title and body are intentionally omitted to preserve Renovate's originals.
-          base: ${{ github.base_ref }}
+          commit_message: "chore(deps): apply post-Renovate hooks"
 
       # ── Step 3: Enable auto-merge ─────────────────────────────────────────
       # GitHub's native auto-merge merges the PR automatically once all
