@@ -1,0 +1,71 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate config driven by the Weekly Dependency Update workflow. Three ordered passes: (1) GitHub Actions, (2) pre-commit hooks, (3) pyproject.toml dependencies.",
+
+  // ── Global behaviour ────────────────────────────────────────────────────
+  // Renovate is invoked directly by the workflow; disable its own scheduler
+  // so it never opens unsolicited PRs on its own.
+  "onboarding": false,
+  "requireConfig": "optional",
+  "automerge": false,
+  "dependencyDashboard": false,
+
+  // Group all updates into a single branch/PR per pass so the workflow
+  // can commit them together. Labels help humans triage.
+  "labels": ["dependencies", "automated"],
+
+  // ── Pass 1 – GitHub Actions ──────────────────────────────────────────────
+  // Renovate detects `uses: owner/repo@ref` in .github/workflows/*.yml.
+  // No extra config needed beyond enabling the manager.
+  "github-actions": {
+    "enabled": true
+  },
+
+  // ── Pass 2 – pre-commit hooks ─────────────────────────────────────────────
+  // Renovate supports pre-commit natively: it reads .pre-commit-config.yaml
+  // and bumps both `rev` values and `additional-dependencies` entries.
+  "pre-commit": {
+    "enabled": true
+  },
+
+  // ── Pass 3 – pyproject.toml (uv / PEP 621) ──────────────────────────────
+  // The `uv` manager understands pyproject.toml written for uv workspaces,
+  // including optional extras and dependency-groups.
+  "pep621": {
+    "enabled": true
+  },
+
+  // ── Package rules – ordering & grouping ──────────────────────────────────
+  "packageRules": [
+    // --- Pass 1: GitHub Actions ---
+    {
+      "description": "Group all GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "groupSlug": "github-actions",
+      "commitMessagePrefix": "ci(actions):",
+      "schedule": ["at any time"] // Timing controlled by the workflow cron
+    },
+
+    // --- Pass 2: pre-commit hooks (rev + additional-dependencies) ---
+    {
+      "description": "Group all pre-commit hook updates",
+      "matchManagers": ["pre-commit"],
+      "groupName": "pre-commit hooks",
+      "groupSlug": "pre-commit",
+      "commitMessagePrefix": "ci(pre-commit):",
+      "schedule": ["at any time"]
+    },
+
+    // --- Pass 3: pyproject.toml – main dependencies ---
+    {
+      "description": "Group main pyproject.toml dependencies",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["project.dependencies", "project.optional-dependencies", "dependency-groups"],
+      "groupName": "pyproject dependencies",
+      "groupSlug": "pyproject-deps",
+      "commitMessagePrefix": "chore(deps):",
+      "schedule": ["at any time"]
+    }
+  ]
+}

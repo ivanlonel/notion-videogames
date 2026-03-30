@@ -14,8 +14,13 @@ repos:
     rev: 0.10.12
     hooks:
       - id: uv-lock
-        # args:
-        #   - --upgrade
+        name: uv-lock (frozen)
+      - id: uv-lock
+        alias: uv-lock-upgrade
+        name: uv-lock (upgrade)
+        args:
+          - --upgrade
+        stages: [manual]
       - id: uv-export
         files: ^(uv\.lock|requirements\.txt)$
         args:
@@ -112,6 +117,7 @@ repos:
       - id: flake8
         args:
           - --config=.flake8
+        language: python
         additional_dependencies:
           - flake8-2020~=1.8
           - flake8-absolute-import~=1.0
@@ -154,6 +160,7 @@ repos:
       - id: mypy
         args:
           - --config-file=pyproject.toml
+        language: python
         additional_dependencies:
           - betterproto~=2.0.0b7
           - notion-client>=2.5
