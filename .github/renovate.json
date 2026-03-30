@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  // The pep621 and pre-commit managers are not enabled by default.
+  // github-actions is enabled by default and listed here for explicitness.
+  "enabledManagers": ["github-actions", "pre-commit", "pep621"],
+
+  // pre-commit support is currently in beta and requires explicit opt-in.
+  "pre-commit": {
+    "enabled": true
+  },
+
+  // Prevent Renovate from rebasing or closing PRs that the workflow has
+  // modified with pre-commit hook output.
+  "rebaseWhen": "never",
+
+  "packageRules": [
+    {
+      // pep621 would normally run `uv lock` to update uv.lock as an artifact
+      // alongside pyproject.toml changes. We disable that here because
+      // uv-lock-upgrade runs as a pre-commit hook in the workflow instead.
+      "matchManagers": ["pep621"],
+      "updateLockFiles": false
+    }
+  ]
+}
