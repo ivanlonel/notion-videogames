@@ -29,3 +29,5 @@ jobs:
         uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all --verbose
+        env:
+          SKIP: uv-lock,uv-export,sync-with-uv
