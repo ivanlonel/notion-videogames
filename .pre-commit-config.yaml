@@ -123,7 +123,7 @@ repos:
           - flake8-absolute-import~=1.0
           - flake8-annotations~=3.2
           - flake8-boolean-trap~=1.0
-          - flake8-bugbear~=25.11.29
+          - flake8-bugbear~=25.11
           - flake8-builtins~=3.1
           - flake8-classmethod-staticmethod~=2.1
           - flake8-cognitive-complexity~=0.1
@@ -138,7 +138,6 @@ repos:
           - flake8-print~=5.0
           - flake8-pytest-style~=2.2
           - flake8-raise~=0.0.5
-          - flake8-return~=1.2
           - flake8-simplify~=0.22
           - flake8-tidy-imports~=4.12
           - flake8-type-checking~=3.0
@@ -163,9 +162,9 @@ repos:
         language: python
         additional_dependencies:
           - betterproto~=2.0.0b7
-          - notion-client>=2.5
-          - pydantic>=2.12
-          - python-dotenv~=1.2.2
-          - tenacity~=9.1.4
+          - notion-client~=2.5
+          - pydantic~=2.12
+          - python-dotenv~=1.2
+          - tenacity~=9.1
           - types-requests~=2.32
           - ultimate-notion~=0.9.6

@@ -717,18 +717,6 @@ wheels = [
 ]
 
 [[package]]
-name = "flake8-return"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "flake8-plugin-utils" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/83/49/43ee60c21b61fbec8e86858b2dac7d11a9bdd9958fd7f59077387b6a7197/flake8-return-1.2.0.tar.gz", hash = "sha256:68dfa56582cd704febd02ad86dcf5df67e38e0836d62f1ceae7930d76d3dd955", size = 10033, upload-time = "2022-10-28T09:37:12.507Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/8c/6aece77ad2d0d68d8f6e8d5471fd06638de11df656db7d76de810815c437/flake8_return-1.2.0-py3-none-any.whl", hash = "sha256:1f07af12954ed03ebe2c2aac2418f78b55374e9929d4956109664588f31582a1", size = 10121, upload-time = "2022-10-28T09:37:14.468Z" },
-]
-
-[[package]]
 name = "flake8-simplify"
 version = "0.30.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1322,7 +1310,6 @@ dev = [
     { name = "flake8-print" },
     { name = "flake8-pytest-style" },
     { name = "flake8-raise" },
-    { name = "flake8-return" },
     { name = "flake8-simplify" },
     { name = "flake8-tidy-imports" },
     { name = "flake8-type-checking" },
@@ -1341,26 +1328,26 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "betterproto", specifier = "~=2.0.0b7" },
-    { name = "howlongtobeatpy", specifier = "~=1.0.20" },
+    { name = "howlongtobeatpy", specifier = "~=1.0" },
     { name = "igdb-api-v4", specifier = "~=0.3.3" },
-    { name = "notion-client", specifier = ">=2.5" },
-    { name = "pydantic", specifier = ">=2.12" },
-    { name = "python-dotenv", specifier = "~=1.2.2" },
-    { name = "requests", specifier = "~=2.33.0" },
-    { name = "tenacity", specifier = "~=9.1.4" },
+    { name = "notion-client", specifier = "~=2.5" },
+    { name = "pydantic", specifier = "~=2.12" },
+    { name = "python-dotenv", specifier = "~=1.2" },
+    { name = "requests", specifier = "~=2.33" },
+    { name = "tenacity", specifier = "~=9.1" },
     { name = "ultimate-notion", specifier = "~=0.9.6" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "bandit", specifier = ">=1.9.4" },
-    { name = "black", specifier = ">=26.3.1" },
-    { name = "flake8", specifier = ">=7.3" },
+    { name = "bandit", specifier = "~=1.9" },
+    { name = "black", specifier = "~=26.3" },
+    { name = "flake8", specifier = "~=7.3" },
     { name = "flake8-2020", specifier = "~=1.8" },
     { name = "flake8-absolute-import", specifier = "~=1.0" },
     { name = "flake8-annotations", specifier = "~=3.2" },
     { name = "flake8-boolean-trap", specifier = "~=1.0" },
-    { name = "flake8-bugbear", specifier = "~=25.11.29" },
+    { name = "flake8-bugbear", specifier = "~=25.11" },
     { name = "flake8-builtins", specifier = "~=3.1" },
     { name = "flake8-classmethod-staticmethod", specifier = "~=2.1" },
     { name = "flake8-cognitive-complexity", specifier = "~=0.1" },
@@ -1375,18 +1362,17 @@ dev = [
     { name = "flake8-print", specifier = "~=5.0" },
     { name = "flake8-pytest-style", specifier = "~=2.2" },
     { name = "flake8-raise", specifier = "~=0.0.5" },
-    { name = "flake8-return", specifier = "~=1.2" },
     { name = "flake8-simplify", specifier = "~=0.30" },
     { name = "flake8-tidy-imports", specifier = "~=4.12" },
     { name = "flake8-type-checking", specifier = "~=3.2" },
     { name = "flake8-use-fstring", specifier = "~=1.4" },
     { name = "flake8-useless-assert", specifier = "~=0.4" },
-    { name = "isort", specifier = ">=8.0.1" },
-    { name = "mypy", specifier = ">=1.19.1" },
+    { name = "isort", specifier = "~=8.0" },
+    { name = "mypy", specifier = "~=1.19" },
     { name = "pep8-naming", specifier = "~=0.15" },
     { name = "pre-commit", specifier = "~=4.5" },
-    { name = "pylint", specifier = ">=4.0.5" },
-    { name = "ruff", specifier = ">=0.15.7" },
+    { name = "pylint", specifier = "~=4.0" },
+    { name = "ruff", specifier = "~=0.15" },
     { name = "tryceratops", specifier = "~=2.4" },
     { name = "types-requests", specifier = "~=2.32" },
 ]

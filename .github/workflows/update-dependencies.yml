@@ -31,7 +31,7 @@ jobs:
       - name: pre-commit – uv-lock-upgrade
         uses: pre-commit/action@v3.0.1
         with:
-          extra_args: --all-files --hook-stage manual uv-lock-upgrade
+          extra_args: --all-files --verbose --hook-stage manual uv-lock-upgrade
         # pre-commit exits non-zero when it modifies files, so we must allow
         # failure here — the commit step will capture whatever changed.
         continue-on-error: true
@@ -39,23 +39,50 @@ jobs:
       - name: pre-commit – uv-export
         uses: pre-commit/action@v3.0.1
         with:
-          extra_args: --all-files uv-export
+          extra_args: --all-files --verbose uv-export
         continue-on-error: true
 
       - name: pre-commit – sync-with-uv
         uses: pre-commit/action@v3.0.1
         with:
-          extra_args: --all-files sync-with-uv
+          extra_args: --all-files --verbose sync-with-uv
         continue-on-error: true
 
       # ── Step 2: Commit any hook-generated changes back to the PR branch ───
+      - name: Build commit message and PR body
+        id: meta
+        run: |
+          # Commit message: list files changed by the hooks
+          CHANGED=$(git diff --name-only | tr '\n' ' ')
+          echo "commit-message=chore(deps): apply post-Renovate hooks to ${CHANGED}" >> "$GITHUB_OUTPUT"
+
+          # PR body: Renovate's original description + git log + changed files
+          RENOVATE_BODY="${{ github.event.pull_request.body }}"
+          GIT_LOG=$(git log origin/${{ github.base_ref }}..HEAD --oneline)
+          DIFF_FILES=$(git diff --name-only | sed 's/^/- /')
+          {
+            echo "body<<EOF"
+            echo "${RENOVATE_BODY}"
+            echo ""
+            echo "---"
+            echo "### Post-Renovate hook changes"
+            echo "**Commits:**"
+            echo "\`\`\`"
+            echo "${GIT_LOG}"
+            echo "\`\`\`"
+            echo "**Files modified by hooks:**"
+            echo "${DIFF_FILES}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Commit changes
         id: create-pr
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.RENOVATE_TOKEN }}
           branch: ${{ github.head_ref }}
-          commit-message: "chore(deps): apply post-Renovate hooks"
+          commit-message: ${{ steps.meta.outputs.commit-message }}
+          body: ${{ steps.meta.outputs.body }}
           # Do not open a new PR — push directly to the existing Renovate branch.
           base: ${{ github.base_ref }}
 
