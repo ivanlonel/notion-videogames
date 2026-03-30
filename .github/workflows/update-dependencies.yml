@@ -1,0 +1,71 @@
+name: Post-Renovate Hooks
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  post-renovate-hooks:
+    # Only run on PRs opened by the Renovate GitHub App.
+    if: github.actor == 'renovate[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          # Check out the actual PR branch so we can push changes back to it.
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.RENOVATE_TOKEN }}
+
+      # ── Step 1: pre-commit hooks ──────────────────────────────────────────
+      # pre-commit/action manages its own environment; no need to install
+      # uv or pre-commit beforehand.
+
+      # Run the three hooks in the required order.
+      # Each is invoked individually so a failure in one doesn't silently
+      # skip the others, and the order is guaranteed.
+      - name: pre-commit – uv-lock-upgrade
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --hook-stage pre-commit uv-lock-upgrade
+        # pre-commit exits non-zero when it modifies files, so we must allow
+        # failure here — the commit step will capture whatever changed.
+        continue-on-error: true
+
+      - name: pre-commit – uv-export
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --hook-stage pre-commit uv-export
+        continue-on-error: true
+
+      - name: pre-commit – sync-with-uv
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --hook-stage pre-commit sync-with-uv
+        continue-on-error: true
+
+      # ── Step 2: Commit any hook-generated changes back to the PR branch ───
+      - name: Commit changes
+        id: create-pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN }}
+          branch: ${{ github.head_ref }}
+          commit-message: "chore(deps): apply post-Renovate hooks"
+          # Do not open a new PR — push directly to the existing Renovate branch.
+          base: ${{ github.base_ref }}
+
+      # ── Step 3: Enable auto-merge ─────────────────────────────────────────
+      # GitHub's native auto-merge merges the PR automatically once all
+      # required branch-protection checks pass. Requires auto-merge to be
+      # enabled in the repo settings (Settings → General → Allow auto-merge).
+      - name: Enable auto-merge
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: rebase
