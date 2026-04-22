@@ -6,6 +6,9 @@
     },
     99 // Use default color
   ],
+  "files.associations": {
+    "renovate.json": "jsonc"
+  },
   "flake8.importStrategy": "fromEnvironment",
   "mypy-type-checker.importStrategy": "fromEnvironment",
   "pylint.importStrategy": "fromEnvironment",

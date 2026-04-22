@@ -20,7 +20,8 @@ repos:
         name: uv-lock (upgrade)
         args:
           - --upgrade
-        stages: [manual]
+        stages:
+          - manual
       - id: uv-export
         files: ^(uv\.lock|requirements\.txt)$
         args:
@@ -31,7 +32,6 @@ repos:
         always_run: true
         args:
           - --locked
-          - --group=dev
 
   - repo: https://github.com/tsvikas/sync-with-uv
     rev: v0.5.0
