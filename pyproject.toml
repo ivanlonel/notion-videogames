@@ -58,11 +58,22 @@ dev = [
   "isort~=8.0",
   "mypy~=1.19",
   "pep8-naming~=0.15",
-  "pre-commit~=4.5",
+  "prek~=0.3",
   "pylint~=4.0",
   "ruff~=0.15",
   "tryceratops~=2.4",
   "types-requests~=2.32",
+]
+# This group lists packages that are not installed in the local environment but are used
+# as pre-commit hooks. The goal is to keep the package versions controlled by uv and
+# synchronized in .pre-commit-config.yaml through sync-with-uv, since `prek autoupdate`
+# ignores certain interpreter version constraints.
+hooks = [
+  "pre-commit-hooks~=6.0",
+  "pyproject-fmt~=2.21",
+  "pyupgrade~=3.21",
+  "sync-with-uv~=0.5",
+  "uv~=0.11",
 ]
 
 [tool.black]

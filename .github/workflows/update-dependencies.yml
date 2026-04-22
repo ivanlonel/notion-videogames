@@ -1,13 +1,17 @@
-name: Post-Renovate Hooks
+name: "⬆️ Post-Renovate Hooks"
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types:
+      - opened
+      - synchronize
 
 jobs:
   post-renovate-hooks:
     # Only run on PRs opened by the Renovate GitHub App.
-    if: github.actor == 'renovate[bot]'
+    if: github.actor == 'renovate[bot]' &&
+      (contains(github.event.pull_request.labels.*.name, 'pep621') ||
+      contains(github.event.pull_request.labels.*.name, 'pre-commit'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,49 +26,50 @@ jobs:
           token: ${{ secrets.RENOVATE_TOKEN }}
 
       # ── Step 1: pre-commit hooks ──────────────────────────────────────────
-      # Only run hooks for pep621 or pre-commit PRs (identified by their
-      # Renovate-assigned labels). github-actions-only PRs skip this section.
-
-      # Run the three hooks in the required order.
+      # Run the hooks in the required order.
       # Each is invoked individually so a failure in one doesn't silently
       # skip the others, and the order is guaranteed.
-      - name: pre-commit – uv-lock
-        if: contains(github.event.pull_request.labels.*.name, 'pep621') || contains(github.event.pull_request.labels.*.name, 'pre-commit')
-        uses: pre-commit/action@v3.0.1
+
+      # Hooks are run twice: the first pass does the work and is allowed to
+      # fail (prek exits 1 when it modifies files). The second pass
+      # verifies the result is stable — if it exits 0, the first pass
+      # succeeded legitimately; if it exits 1 again, there was a real error
+      # (e.g. incompatible dependencies) and the workflow fails.
+      - name: prek – uv-lock (first pass)
+        uses: j178/prek-action@v2
         with:
-          extra_args: --all-files --verbose --hook-stage manual uv-lock-upgrade
-        # pre-commit exits non-zero when it modifies files, so we must allow
-        # failure here — the commit step will capture whatever changed.
+          extra-args: --all-files --verbose --hook-stage manual uv-lock-upgrade
         continue-on-error: true
 
-      - name: pre-commit – uv-export
-        if: contains(github.event.pull_request.labels.*.name, 'pep621') || contains(github.event.pull_request.labels.*.name, 'pre-commit')
-        uses: pre-commit/action@v3.0.1
+      - name: prek – uv-lock (verify)
+        uses: j178/prek-action@v2
         with:
-          extra_args: --all-files --verbose uv-export
+          extra-args: --all-files --verbose --hook-stage manual uv-lock-upgrade
+
+      - name: prek – uv-export (first pass)
+        uses: j178/prek-action@v2
+        with:
+          extra-args: --all-files --verbose --hook-stage manual uv-export
         continue-on-error: true
 
-      - name: pre-commit – sync-with-uv
-        if: contains(github.event.pull_request.labels.*.name, 'pep621') || contains(github.event.pull_request.labels.*.name, 'pre-commit')
-        uses: pre-commit/action@v3.0.1
+      - name: prek – uv-export (verify)
+        uses: j178/prek-action@v2
         with:
-          extra_args: --all-files --verbose sync-with-uv
+          extra-args: --all-files --verbose --hook-stage manual uv-export
+
+      - name: prek – sync-with-uv (first pass)
+        uses: j178/prek-action@v2
+        with:
+          extra-args: --all-files --verbose --hook-stage manual sync-with-uv
         continue-on-error: true
+
+      - name: prek – sync-with-uv (verify)
+        uses: j178/prek-action@v2
+        with:
+          extra-args: --all-files --verbose --hook-stage manual sync-with-uv
 
       # ── Step 2: Commit any hook-generated changes back to the PR branch ───
       - name: Commit changes
-        id: auto-commit
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore(deps): apply post-Renovate hooks"
-
-      # ── Step 3: Enable auto-merge ─────────────────────────────────────────
-      # GitHub's native auto-merge merges the PR automatically once all
-      # required branch-protection checks pass. Requires auto-merge to be
-      # enabled in the repo settings (Settings → General → Allow auto-merge).
-      - name: Enable auto-merge
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.RENOVATE_TOKEN }}
-          pull-request-number: ${{ github.event.pull_request.number }}
-          merge-method: rebase

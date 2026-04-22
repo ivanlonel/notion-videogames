@@ -9,25 +9,19 @@ on:
     branches:
       - main
 
-env:
-  PYTHON_VERSION: 3.12
-
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Get source code
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Run prek
+        uses: j178/prek-action@v2
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Run pre-commit
-        uses: pre-commit/action@v3.0.1
-        with:
-          extra_args: --all --verbose
+          extra-args: --all-files --verbose
         env:
           SKIP: uv-lock,uv-export,sync-with-uv
