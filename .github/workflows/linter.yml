@@ -23,5 +23,3 @@ jobs:
         uses: j178/prek-action@v2
         with:
           extra-args: --all-files --verbose
-        env:
-          SKIP: uv-lock,uv-export,sync-with-uv
