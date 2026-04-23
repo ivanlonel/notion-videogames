@@ -19,10 +19,10 @@ from notion_videogames import (
     custom_notion,
     hltb_notion,
     igdb_notion,
-    igdb_proto,
     notion,
     steamspy_notion,
 )
+from notion_videogames.proto import proto
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -140,12 +140,12 @@ def get_twitch_oauth2_token(
     return dic
 
 
-def query_igdb_games(wrapper: IGDBWrapper, query: str) -> list[igdb_proto.Game]:
-    return igdb_proto.GameResult.FromString(wrapper.api_request("games.pb", query)).games
+def query_igdb_games(wrapper: IGDBWrapper, query: str) -> list[proto.Game]:
+    return proto.GameResult.FromString(wrapper.api_request("games.pb", query)).games
 
 
-def query_igdb_external_games(wrapper: IGDBWrapper, query: str) -> list[igdb_proto.ExternalGame]:
-    return igdb_proto.ExternalGameResult.FromString(
+def query_igdb_external_games(wrapper: IGDBWrapper, query: str) -> list[proto.ExternalGame]:
+    return proto.ExternalGameResult.FromString(
         wrapper.api_request("external_games.pb", query)
     ).externalgames
 
@@ -249,7 +249,7 @@ if __name__ == "__main__":
             for batch in itertools.batched(quoted_steam_appids, 25)
         )
 
-        games += [external.game for external in external_games]
+        games += [external.game for external in external_games if external.game]
 
         root_page = notion_session.get_page(MAIN_PAGE_ID)
 
@@ -270,7 +270,11 @@ if __name__ == "__main__":
 
         for game in games:
             steam_id = next(
-                (int(eg.uid) for eg in game.external_games if eg.external_game_source.id == 1),
+                (
+                    int(eg.uid)
+                    for eg in game.external_games
+                    if eg.external_game_source and eg.external_game_source.id == 1
+                ),
                 None,
             )
 

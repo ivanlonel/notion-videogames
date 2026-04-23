@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import functools
-from dataclasses import dataclass
-from typing import override
+from typing import TYPE_CHECKING, override
 
 import ultimate_notion as uno
+from pydantic.dataclasses import dataclass
 from ultimate_notion import PropType, props
 
-from notion_videogames import hltb_notion, igdb_notion, igdb_proto, notion, steamspy_notion
+from notion_videogames import hltb_notion, igdb_notion, notion, steamspy_notion
+
+if TYPE_CHECKING:
+    from notion_videogames.proto import proto
 
 
 @dataclass(frozen=True)
 class CustomGame:
-    igdb: igdb_proto.Game
+    igdb: proto.Game
     hltb: hltb_notion.HowLongToBeatGame | None = None
     steamspy: steamspy_notion.SteamSpyGame | None = None
 
@@ -196,7 +199,7 @@ class CustomGamePage(notion.NotionPageType[CustomGame]):
         icon_url: str | None = None,
         cover_url: str | None = None,
     ) -> uno.Page:
-        if not icon_url and data.igdb.cover.url:
+        if not icon_url and data.igdb.cover and data.igdb.cover.url:
             icon_url = igdb_notion.add_https_scheme(data.igdb.cover.url)
         if not cover_url and icon_url:
             cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")

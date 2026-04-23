@@ -79,6 +79,7 @@ repos:
       - id: pyupgrade
         args:
           - --py312-plus
+        exclude: ^notion_videogames/proto/
 
   - repo: https://github.com/PyCQA/isort
     rev: 8.0.1
@@ -120,7 +121,6 @@ repos:
           - flake8-classmethod-staticmethod~=2.1
           - flake8-cognitive-complexity~=0.1
           - flake8-comprehensions~=3.17
-          - flake8-datetimez~=20.10
           - flake8-docstrings~=1.7
           - flake8-encodings~=0.5
           - flake8-implicit-str-concat~=0.6
@@ -146,16 +146,16 @@ repos:
           - --rcfile=pyproject.toml
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.20.1
+    rev: v1.20.2
     hooks:
       - id: mypy
         args:
           - --config-file=pyproject.toml
         language: python
         additional_dependencies:
-          - betterproto~=2.0.0b7
+          - betterproto2~=0.9
           - notion-client~=2.5
-          - pydantic~=2.12
+          - pydantic~=2.12.5
           - python-dotenv~=1.2
           - tenacity~=9.1
           - types-requests~=2.32

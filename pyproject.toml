@@ -14,11 +14,11 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-  "betterproto~=2.0.0b7",
+  "betterproto2~=0.9",
   "howlongtobeatpy~=1.0",
   "igdb-api-v4~=0.3.3",
   "notion-client~=2.5",
-  "pydantic~=2.12",
+  "pydantic~=2.12.5",
   "python-dotenv~=1.2",
   "requests~=2.33",
   "tenacity~=9.1",
@@ -39,7 +39,6 @@ dev = [
   "flake8-classmethod-staticmethod~=2.1",
   "flake8-cognitive-complexity~=0.1",
   "flake8-comprehensions~=3.17",
-  "flake8-datetimez~=20.10",
   "flake8-docstrings~=1.7",
   "flake8-encodings~=0.5",
   "flake8-implicit-str-concat~=0.6",
@@ -55,7 +54,7 @@ dev = [
   "flake8-use-fstring~=1.4",
   "flake8-useless-assert~=0.4",
   "isort~=8.0",
-  "mypy~=1.19",
+  "mypy~=1.20",
   "pep8-naming~=0.15",
   "prek~=0.3",
   "pylint~=4.0",
@@ -77,12 +76,13 @@ hooks = [
 
 [tool.black]
 line-length = 99
+force-exclude = "notion_videogames/proto"
 
 [tool.ruff]
-required-version = ">=0.15"
+required-version = ">=0.9"
 line-length = 99
-exclude = [
-  "igdb_proto.py",
+extend-exclude = [
+  "notion_videogames/proto/",
 ]
 lint.select = [ "ALL" ]
 lint.ignore = [
@@ -90,7 +90,7 @@ lint.ignore = [
   "D1",     # Missing Docstrings (pydocstyle)
   "D203",   # Use a blank line to separate the docstring from the class definition
   "D212",   # Multi-line docstring summary should start at the first line
-  "E203",   # Whitespace before ‘,’, ‘;’, or ‘:’
+  "E203",   # Whitespace before ',', ';', or ':'
   # (Black enforces an equal amount of whitespace around slice operators)
   "E501",   # Line too long (pycodestyle)
   "E701",   # Multiple statements on one line (colon)
@@ -104,13 +104,17 @@ lint.mccabe.max-complexity = 15  # default 10  # C901
 profile = "black"
 line_length = 99
 skip_gitignore = true
+extend_skip_glob = [
+  "notion_videogames/proto/*",
+]
 
 [tool.pycln]
 all = true
+extend_exclude = "notion_videogames/proto"
 
 [tool.pylint]
-ignore = [
-  "igdb_proto.py",
+ignore-paths = [
+  "^notion_videogames/proto/.*$",
 ]
 messages_control.disable = [
   "missing-module-docstring",   # C0114
@@ -160,7 +164,7 @@ overrides = [
     "howlongtobeatpy.*",
     "igdb.*",
   ], ignore_missing_imports = true },
-  { module = [ "notion_videogames.igdb_proto" ], disable_error_code = [
-    "explicit-override",
-  ] },
+  { module = [
+    "notion_videogames.proto.*",
+  ], ignore_errors = true },
 ]

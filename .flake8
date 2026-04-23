@@ -42,7 +42,7 @@ extend-ignore =
 per-file-ignores =
     # Needed to use a ruff noqa comment with a code flake8 does not recognize
     notion_videogames/igdb_notion.py: NQA102
-exclude = notion_videogames/igdb_proto.py
+extend-exclude = notion_videogames/proto/*
 max-complexity = 15
 max-doc-length = 99
 max-line-length = 90
