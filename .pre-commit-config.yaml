@@ -130,9 +130,9 @@ repos:
           - flake8-print~=5.0
           - flake8-pytest-style~=2.2
           - flake8-raise~=0.0.5
-          - flake8-simplify~=0.22
+          - flake8-simplify~=0.30
           - flake8-tidy-imports~=4.12
-          - flake8-type-checking~=3.0
+          - flake8-type-checking~=3.2
           - flake8-use-fstring~=1.4
           - flake8-useless-assert~=0.4
           - pep8-naming~=0.15
@@ -158,5 +158,12 @@ repos:
           - pydantic~=2.12.5
           - python-dotenv~=1.2
           - tenacity~=9.1
-          - types-requests~=2.32
+          - types-requests~=2.33
           - ultimate-notion~=0.9.6
+
+  - repo: https://github.com/osprey-oss/deptry
+    rev: 0.25.1
+    hooks:
+      - id: deptry
+        stages:
+          - manual
