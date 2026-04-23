@@ -28,7 +28,6 @@ urls.Repository = "https://github.com/ivanlonel/notion-videogames"
 
 [dependency-groups]
 dev = [
-  "bandit~=1.9",
   "black~=26.3",
   "flake8~=7.3",
   "flake8-2020~=1.8",
