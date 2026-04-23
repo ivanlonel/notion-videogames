@@ -1,19 +1,28 @@
 root = true
 
 [*]
-indent_style = space
-indent_size = 2
-end_of_line = lf
 charset = utf-8
-trim_trailing_whitespace = true
-insert_final_newline = true
-
-[*.md]
-trim_trailing_whitespace = false
-
-[*.{flake8,txt}]
+end_of_line = lf
+indent_style = space
 indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
 
 [*.{py,pyi}]
 profile = black
-indent_size = 4
+
+[*.{conf,ini,json,json5,jsonc,sh,toml,xml,yaml,yml}]
+indent_size = 2
+
+[*.{md,mdown,mdx,markdown}]
+indent_size = 2
+trim_trailing_whitespace = false
+
+[*.{csv,tsv,tab}]
+indent_style = tab
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+end_of_line = crlf
+indent_style = tab
