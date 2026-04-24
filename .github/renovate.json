@@ -13,6 +13,8 @@
   // Automatically merge updates if CI build status is passing.
   "automerge": true,
   "automergeStrategy": "squash",
+  "constraintsFiltering": "strict",
+  "rangeStrategy": "bump",
   // The pep621 and pre-commit managers are not enabled by default.
   // github-actions is enabled by default and listed here for explicitness.
   "enabledManagers": [
@@ -74,10 +76,8 @@
         "pep621",
         "pre-commit"
       ],
-      "constraintsFiltering": "strict",
       "groupName": "pep621 and pre-commit",
-      "groupSlug": "pep621-pre-commit",
-      "rangeStrategy": "bump"
+      "groupSlug": "pep621-pre-commit"
     }
   ]
 }
