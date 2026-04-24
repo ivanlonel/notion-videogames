@@ -4,31 +4,35 @@ from __future__ import annotations
 import functools
 import itertools
 import urllib.parse
-from typing import Final, TypeVar, override
+from typing import TYPE_CHECKING, Final, TypeVar, cast, override
 
-import betterproto2
 import ultimate_notion as uno
+from betterproto2 import Message
 from ultimate_notion import PropType, props
 
 from notion_videogames import notion
 from notion_videogames.proto import proto
 
-T = TypeVar("T", bound=betterproto2.Message)
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+T = TypeVar("T", bound=Message)
 
 # https://developers.notion.com/reference/request-limits
 MAX_RELATION_PAGES: Final[int] = 100
 MAX_TEXT_LENGTH: Final[int] = 2000
 
 
-def _hash(self: betterproto2.Message) -> int:
-    return hash(bytes(self))
-
-
 # Monkeypatch betterproto2.Message adding a __hash__ method so instances can be used in lru_cache
-betterproto2.Message.__hash__ = _hash  # type: ignore[assignment,method-assign]
+if cast("Callable[[object], int] | None", Message.__hash__) is None:
+
+    def _hash(self: Message) -> int:
+        return hash(bytes(self))
+
+    Message.__hash__ = _hash  # type: ignore[assignment] # ty: ignore[invalid-assignment]
 
 
-def add_https_scheme[AnyStr: (bytes, str)](url: AnyStr) -> AnyStr:
+def add_https_scheme(url: str) -> str:
     parsed_url = urllib.parse.urlparse(url)
 
     if parsed_url.scheme:
@@ -36,11 +40,7 @@ def add_https_scheme[AnyStr: (bytes, str)](url: AnyStr) -> AnyStr:
         return url
 
     # If there's no scheme, add 'https'
-    new_components = (
-        "https" if isinstance(url, str) else b"https",  # type: ignore[redundant-expr]
-        *parsed_url[1:],  # type: ignore[has-type]
-    )
-    return urllib.parse.urlunparse(new_components)  # type: ignore[no-any-return]
+    return urllib.parse.urlunparse(("https", *parsed_url[1:]))
 
 
 class IGDBNotionPage(notion.NotionPageType[T]):

@@ -63,6 +63,11 @@
       ]
     },
     {
+      "matchPackageNames": ["pydantic"],
+      "allowedVersions": "<2.13",
+      "description": "Until https://github.com/ultimate-notion/ultimate-notion/issues/189 is fixed"
+    },
+    {
       // Group pep621 and pre-commit updates into a single PR so the
       // pre-commit hook revs and pyproject.toml deps land together.
       "matchManagers": [

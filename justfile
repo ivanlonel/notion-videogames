@@ -69,6 +69,7 @@ sync:
 [group('QA')]
 format:
     @{{ title }} "Running automatic formatting/cleanup..."
+    -uv run ty check --fix
     -uv run ruff check --fix
     uv run ruff format
 
@@ -84,6 +85,7 @@ lint:
 [group('QA')]
 type-check:
     @{{ title }} "Running static type checking with mypy..."
+    uv run ty check
     uv run mypy notion_videogames
 
 [doc('Run all QA checks')]

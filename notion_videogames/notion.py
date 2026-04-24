@@ -9,8 +9,7 @@ import tenacity
 import ultimate_notion as uno
 from notion_client.errors import HTTPResponseError, RequestTimeoutError
 from pydantic import ValidationError
-from ultimate_notion.core import Wrapper
-from ultimate_notion.emoji import CustomEmoji, Emoji
+from ultimate_notion.emoji import CustomEmoji, Emoji, EmojiBase
 from ultimate_notion.errors import ReadOnlyPropertyError, SchemaError
 from ultimate_notion.obj_api.core import Unset, UnsetType
 
@@ -29,9 +28,9 @@ class NotionPageType[T](abc.ABC):
     update: ClassVar[bool] = False
     """Whether pages that already exist should be updated"""
 
-    @classmethod
+    @staticmethod
     @abc.abstractmethod
-    def get_populated_properties_dict(cls, data: T) -> dict[str, props.PropertyValue]: ...
+    def get_populated_properties_dict(data: T) -> dict[str, props.PropertyValue]: ...
 
     @classmethod
     @abc.abstractmethod
@@ -98,14 +97,14 @@ class NotionPageType[T](abc.ABC):
         cover: uno.AnyFile | UnsetType | None = Unset,
         icon: uno.AnyFile | Emoji | CustomEmoji | str | UnsetType | None = Unset,
     ) -> None:
-        if isinstance(icon, str) and not isinstance(icon, (Emoji, CustomEmoji)):
+        if isinstance(icon, str) and not isinstance(icon, EmojiBase):
             icon = Emoji(icon)
 
         uno.Session.get_active().api.pages.update(
             page.obj_ref if isinstance(page, uno.Page) else page,
             properties=cls.validate_and_build_schema_model(data).to_dict(),
             cover=cover.obj_ref if isinstance(cover, uno.AnyFile) else cover,
-            icon=icon.obj_ref if isinstance(icon, Wrapper) else icon,
+            icon=icon.obj_ref if isinstance(icon, (uno.AnyFile, EmojiBase)) else icon,
         )
 
     @classmethod
