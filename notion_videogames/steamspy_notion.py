@@ -5,6 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
 import requests
+import requests.adapters
 import ultimate_notion as uno
 import urllib3
 from pydantic.dataclasses import dataclass

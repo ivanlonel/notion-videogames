@@ -62,6 +62,7 @@ dev = [
   "pylint~=4.0",
   "ruff~=0.15",
   "tryceratops~=2.4",
+  "ty~=0.0.32",
   "types-requests~=2.33",
 ]
 # This group lists packages that are not installed in the local environment but are used
@@ -176,3 +177,6 @@ overrides = [
     "notion_videogames.proto.*",
   ], ignore_errors = true },
 ]
+
+[tool.ty]
+analysis.respect-type-ignore-comments = false

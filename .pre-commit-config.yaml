@@ -161,9 +161,25 @@ repos:
           - types-requests~=2.33
           - ultimate-notion~=0.9.6
 
-  - repo: https://github.com/osprey-oss/deptry
-    rev: 0.25.1
+  - repo: local
+    hooks:
+      - id: ty-check
+        name: ty check
+        description: Type check with ty.
+        entry: uv run ty check
+        language: system
+        pass_filenames: false
+        require_serial: true
+        types:
+         - python
+
+  - repo: local
     hooks:
       - id: deptry
-        stages:
-          - manual
+        name: deptry
+        entry: uv run deptry .
+        language: system
+        pass_filenames: false
+        types:
+         - python
+        always_run: true

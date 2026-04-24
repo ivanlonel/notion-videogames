@@ -9,6 +9,8 @@
   "files.associations": {
     "renovate.json": "jsonc"
   },
+  "python.languageServer": "Pylance",
+  "ty.disableLanguageServices": true,
   "flake8.importStrategy": "fromEnvironment",
   "mypy-type-checker.importStrategy": "fromEnvironment",
   "pylint.importStrategy": "fromEnvironment",
