@@ -21,9 +21,6 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v8.1.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: 'uv.lock'
 
       - name: Run prek
         uses: j178/prek-action@v2
