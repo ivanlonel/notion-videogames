@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Self, override
+from typing import TYPE_CHECKING, Any, ClassVar, Self, cast, override
 
 import ultimate_notion as uno
 from howlongtobeatpy.HowLongToBeat import HowLongToBeat
@@ -212,4 +212,6 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame]):
             return None
 
         best = max(results, key=lambda element: element.similarity)
-        return HowLongToBeatGame.from_dict(best.json_content | {"similarity": best.similarity})
+        return HowLongToBeatGame.from_dict(
+            cast("dict[str, Any]", best.json_content) | {"similarity": best.similarity}
+        )
