@@ -17,13 +17,13 @@ dependencies = [
   "betterproto2~=0.9",
   "howlongtobeatpy~=1.0",
   "igdb-api-v4~=0.3.3",
-  "notion-client~=2.5",
+  "notion-client",          # Let ultimate-notion dictate notion-client's version
   "pydantic~=2.12.5",
   "python-dotenv~=1.2",
   "requests~=2.33",
   "tenacity~=9.1",
   "ultimate-notion~=0.9.6",
-  "urllib3~=2.6"
+  "urllib3",                # Let requests dictate urllib3's version
 ]
 urls.Repository = "https://github.com/ivanlonel/notion-videogames"
 

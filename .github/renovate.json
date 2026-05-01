@@ -10,11 +10,10 @@
     "* 0-7 * * 1"
   ],
   "minimumReleaseAge": "1 day",
+  "prHourlyLimit": 5,
   // Automatically merge updates if CI build status is passing.
   "automerge": true,
   "automergeStrategy": "squash",
-  "constraintsFiltering": "strict",
-  "rangeStrategy": "bump",
   // The pep621 and pre-commit managers are not enabled by default.
   // github-actions is enabled by default and listed here for explicitness.
   "enabledManagers": [
@@ -28,25 +27,23 @@
   },
   "packageRules": [
     {
-      // Don't suggest upgrades on Python version
-      "matchManagers": [
-        "pep621"
-      ],
       "matchDepNames": [
+        // Don't suggest upgrades for the project's required Python version.
         "python"
       ],
       "enabled": false
     },
     {
-      // pep621 would normally run `uv lock` to update uv.lock as an artifact alongside pyproject.toml changes.
-      // We disable that here because uv-lock-upgrade runs as a pre-commit hook in the workflow instead.
+      // Don't suggest upgrades for the pre-commit repos themselves. That's done
+      // by sync-with-uv in the workflow. Renovate's pre-commit manager should
+      // only offer upgrades for packages in additional_dependencies fields.
       "matchManagers": [
-        "pep621"
+        "pre-commit"
       ],
-      "addLabels": [
-        "pep621"
+      "matchDepTypes": [
+        "repository"
       ],
-      "skipArtifactsUpdate": true
+      "enabled": false
     },
     {
       "matchManagers": [
@@ -54,6 +51,14 @@
       ],
       "addLabels": [
         "pre-commit"
+      ]
+    },
+    {
+      "matchManagers": [
+        "pep621"
+      ],
+      "addLabels": [
+        "pep621"
       ]
     },
     {
@@ -70,14 +75,21 @@
       "description": "Until https://github.com/ultimate-notion/ultimate-notion/issues/189 is fixed"
     },
     {
-      // Group pep621 and pre-commit updates into a single PR so the
-      // pre-commit hook revs and pyproject.toml deps land together.
+      // Group pep621 and pre-commit updates into a single PR so the pre-commit
+      // additional_dependencies and pyproject.toml deps land together.
       "matchManagers": [
         "pep621",
         "pre-commit"
       ],
       "groupName": "pep621 and pre-commit",
-      "groupSlug": "pep621-pre-commit"
+      "groupSlug": "pep621-pre-commit",
+      // Filter new releases based on configured or detected constraints.
+      "constraintsFiltering": "strict",
+      // Bump the range even if the new version satisfies the existing range.
+      "rangeStrategy": "bump",
+      // Don't update uv.lock as an artifact. That's done by
+      // the uv-lock-upgrade pre-commit hook in the workflow.
+      "skipArtifactsUpdate": true
     }
   ]
 }
