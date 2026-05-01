@@ -1296,13 +1296,13 @@ requires-dist = [
     { name = "betterproto2", specifier = "~=0.9" },
     { name = "howlongtobeatpy", specifier = "~=1.0" },
     { name = "igdb-api-v4", specifier = "~=0.3.3" },
-    { name = "notion-client", specifier = "~=2.5" },
+    { name = "notion-client" },
     { name = "pydantic", specifier = "~=2.12.5" },
     { name = "python-dotenv", specifier = "~=1.2" },
     { name = "requests", specifier = "~=2.33" },
     { name = "tenacity", specifier = "~=9.1" },
     { name = "ultimate-notion", specifier = "~=0.9.6" },
-    { name = "urllib3", specifier = "~=2.6" },
+    { name = "urllib3" },
 ]
 
 [package.metadata.requires-dev]
