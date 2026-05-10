@@ -153,7 +153,7 @@ repos:
           - --config-file=pyproject.toml
         language: python
         additional_dependencies:
-          - betterproto2~=0.9
+          - betterproto2~=0.10
           - notion-client # Let ultimate-notion dictate the version of this dependency
           - pydantic~=2.12.5
           - python-dotenv~=1.2

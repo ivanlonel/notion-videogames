@@ -14,7 +14,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-  "betterproto2~=0.9",
+  "betterproto2~=0.10",
   "howlongtobeatpy~=1.0",
   "igdb-api-v4~=0.3.3",
   "notion-client",          # Let ultimate-notion dictate notion-client's version
