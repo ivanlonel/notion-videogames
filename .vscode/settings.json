@@ -28,7 +28,4 @@
     "editor.defaultFormatter": "nefrob.vscode-just-syntax",
     "editor.formatOnSave": true
   },
-  "terminal.integrated.env.windows": {
-    "PYTHONPATH": "${env:PYTHONPATH};${workspaceFolder}",
-  },
 }

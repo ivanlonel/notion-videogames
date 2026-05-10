@@ -45,7 +45,7 @@ proto:
 [doc('Run the main application')]
 run:
     @{{ title }} "Running main.py..."
-    uv run notion_videogames/main.py
+    uv run -m notion_videogames.main
 
 [doc('Update uv.lock to reflect the latest compatible versions of dependencies listed in pyproject.toml')]
 [group('Dependencies')]
