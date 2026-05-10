@@ -83,8 +83,6 @@
       ],
       "groupName": "pep621 and pre-commit",
       "groupSlug": "pep621-pre-commit",
-      // Filter new releases based on configured or detected constraints.
-      "constraintsFiltering": "strict",
       // Bump the range even if the new version satisfies the existing range.
       "rangeStrategy": "bump",
       // Don't update uv.lock as an artifact. That's done by
