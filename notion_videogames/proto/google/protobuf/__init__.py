@@ -12,10 +12,11 @@ import betterproto2
 import dateutil.parser
 import pydantic
 from pydantic.dataclasses import dataclass
+from typing_extensions import Self
 
 from ...message_pool import default_message_pool
 
-_COMPILER_VERSION = "0.9.0"
+_COMPILER_VERSION = "0.10.0"
 betterproto2.check_compiler_version(_COMPILER_VERSION)
 
 
@@ -133,7 +134,7 @@ class Timestamp(betterproto2.Message):
     """
 
     @classmethod
-    def from_datetime(cls, dt: datetime.datetime) -> "Timestamp":
+    def from_datetime(cls, dt: datetime.datetime) -> Self:
         if not dt.tzinfo:
             raise ValueError("datetime must be timezone aware")
 
@@ -178,11 +179,11 @@ class Timestamp(betterproto2.Message):
         return f"{result}.{nanos:09d}"
 
     @classmethod
-    def from_dict(cls, value, *, ignore_unknown_fields: bool = False):
+    def from_dict(cls, value, *, ignore_unknown_fields: bool = False) -> Self:
         if isinstance(value, str):
             dt = dateutil.parser.isoparse(value)
             dt = dt.astimezone(datetime.timezone.utc)
-            return Timestamp.from_datetime(dt)
+            return cls.from_datetime(dt)
 
         return super().from_dict(value, ignore_unknown_fields=ignore_unknown_fields)
 
