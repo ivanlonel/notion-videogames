@@ -160,7 +160,6 @@ extra_checks = true
 no_implicit_reexport = true
 show_column_numbers = true
 show_error_context = true
-strict_bytes = true
 strict_equality = true
 strict_equality_for_none = true
 warn_redundant_casts = true
@@ -180,3 +179,6 @@ overrides = [
 
 [tool.ty]
 analysis.respect-type-ignore-comments = false
+
+[tool.sync-with-uv]
+repo-to-package."https://github.com/astral-sh/uv-pre-commit" = "uv"

@@ -1,5 +1,6 @@
 # -- Code quality ------------------------------------
 [flake8]
+count = True
 extend-select =
     # Using return x in a generator (flake8-bugbear)
     B901
@@ -47,5 +48,6 @@ max-complexity = 15
 max-doc-length = 99
 max-line-length = 90
 max-cognitive-complexity = 15
-noqa-require-code = true
-noqa-include-name = true
+noqa-require-code = True
+noqa-include-name = True
+statistics = True
