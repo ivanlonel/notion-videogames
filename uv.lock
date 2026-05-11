@@ -1379,7 +1379,7 @@ dev = [
     { name = "pylint", specifier = "~=4.0" },
     { name = "ruff", specifier = "~=0.15" },
     { name = "tryceratops", specifier = "~=2.4" },
-    { name = "ty", specifier = "~=0.0.34" },
+    { name = "ty", specifier = "~=0.0.35" },
     { name = "types-requests", specifier = "~=2.33" },
 ]
 hooks = [
