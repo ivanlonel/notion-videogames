@@ -20,7 +20,7 @@ dependencies = [
   "notion-client",          # Let ultimate-notion dictate notion-client's version
   "pydantic~=2.12.5",
   "python-dotenv~=1.2",
-  "requests~=2.33",
+  "requests~=2.34",
   "tenacity~=9.1",
   "ultimate-notion~=0.9.6",
   "urllib3",                # Let requests dictate urllib3's version
@@ -29,7 +29,7 @@ urls.Repository = "https://github.com/ivanlonel/notion-videogames"
 
 [dependency-groups]
 dev = [
-  "black~=26.3",
+  "black~=26.5",
   "deptry~=0.25",
   "flake8~=7.3",
   "flake8-2020~=1.8",
@@ -56,13 +56,13 @@ dev = [
   "flake8-use-fstring~=1.4",
   "flake8-useless-assert~=0.4",
   "isort~=8.0",
-  "mypy[faster-cache]~=2.0",
+  "mypy[faster-cache]~=2.1",
   "pep8-naming~=0.15",
-  "prek~=0.3",
+  "prek~=0.4",
   "pylint~=4.0",
   "ruff~=0.15",
   "tryceratops~=2.4",
-  "ty~=0.0.35",
+  "ty~=0.0.37",
   "types-requests~=2.33",
 ]
 # This group lists packages that are not installed in the local environment but are used
