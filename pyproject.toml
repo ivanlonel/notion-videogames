@@ -62,7 +62,7 @@ dev = [
   "pylint~=4.0",
   "ruff~=0.15",
   "tryceratops~=2.4",
-  "ty~=0.0.37",
+  "ty~=0.0.39",
   "types-requests~=2.33",
 ]
 # This group lists packages that are not installed in the local environment but are used
