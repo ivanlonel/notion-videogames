@@ -68,6 +68,18 @@ jobs:
         with:
           extra-args: --all-files --verbose --hook-stage manual sync-with-uv
 
+      # Make sure Renovate didn't upset pyproject-fmt by, e.g., misaligning comments.
+      - name: prek – pyproject-fmt (first pass)
+        uses: j178/prek-action@v2
+        with:
+          extra-args: --all-files --verbose --hook-stage manual pyproject-fmt
+        continue-on-error: true
+
+      - name: prek – pyproject-fmt (verify)
+        uses: j178/prek-action@v2
+        with:
+          extra-args: --all-files --verbose --hook-stage manual pyproject-fmt
+
       # ── Step 2: Commit any hook-generated changes back to the PR branch ───
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v7
