@@ -62,7 +62,7 @@ dev = [
   "pylint~=4.0",
   "ruff~=0.15",
   "tryceratops~=2.4",
-  "ty~=0.0.39",
+  "ty~=0.0.44",
   "types-requests~=2.33",
 ]
 # This group lists packages that are not installed in the local environment but are used
@@ -71,7 +71,7 @@ dev = [
 # ignores certain interpreter version constraints.
 hooks = [
   "pre-commit-hooks~=6.0",
-  "pyproject-fmt~=2.21",
+  "pyproject-fmt~=2.23",
   "pyupgrade~=3.21",
   "sync-with-uv~=0.5",
   "uv~=0.11",
