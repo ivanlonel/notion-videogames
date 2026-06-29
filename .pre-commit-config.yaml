@@ -11,7 +11,7 @@ repos:
       - id: check-useless-excludes
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.21
+    rev: 0.11.25
     hooks:
       - id: uv-lock
         name: uv-lock (frozen)
@@ -69,7 +69,7 @@ repos:
       - id: text-unicode-replacement-char
 
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.24.1
+    rev: v2.25.1
     hooks:
       - id: pyproject-fmt
 
@@ -85,18 +85,14 @@ repos:
     rev: 8.0.1
     hooks:
       - id: isort
-        args:
-          - --settings-path=pyproject.toml
 
   - repo: https://github.com/psf/black-pre-commit-mirror
     rev: 26.5.1
     hooks:
       - id: black
-        args:
-          - --config=pyproject.toml
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.17
+    rev: v0.15.20
     hooks:
       - id: ruff-check
         args:
@@ -142,44 +138,44 @@ repos:
     rev: v4.0.6
     hooks:
       - id: pylint
-        args:
-          - --rcfile=pyproject.toml
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
     hooks:
       - id: mypy
         args:
-          - --config-file=pyproject.toml
+          - --show-traceback
         language: python
         additional_dependencies:
           - betterproto2~=0.10
           - notion-client # Let ultimate-notion dictate the version of this dependency
-          - pydantic~=2.12.5
+          - pydantic~=2.13.4
           - python-dotenv~=1.2
+          - requests~=2.34
           - tenacity~=9.1
-          - types-requests~=2.33
-          - ultimate-notion~=0.9.6
+          - ultimate-notion~=0.9.11
 
   - repo: local
     hooks:
       - id: ty-check
         name: ty check
-        description: Type check with ty.
-        entry: uv run ty check
+        entry: uv run --exact ty
+        args:
+          - check
+          - --fix
         language: system
         pass_filenames: false
         require_serial: true
-        types:
+        types_or:
           - python
+          - pyi
 
-  - repo: local
-    hooks:
       - id: deptry
         name: deptry
-        entry: uv run deptry .
+        entry: uv run --exact deptry
+        args:
+          - .
         language: system
         pass_filenames: false
-        types:
-          - python
+        require_serial: true
         always_run: true
