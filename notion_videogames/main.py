@@ -204,7 +204,7 @@ if __name__ == "__main__":
     igdb = IGDBWrapper(IGDB_CLIENT_ID, igdb_token)
 
     # Initialize Notion client
-    with uno.Session.get_or_create() as notion_session:  # ty: ignore[invalid-context-manager]
+    with uno.Session.get_or_create() as notion_session:
         pages: list[uno.Page] = list(notion_session.get_db(SOURCE_DB_ID).get_all_pages())
 
         url_path_parts = get_url_path_parts(str(page.props["URL"]) for page in pages)

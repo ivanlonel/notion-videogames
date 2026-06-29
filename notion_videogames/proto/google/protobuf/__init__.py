@@ -16,7 +16,7 @@ from typing_extensions import Self
 
 from ...message_pool import default_message_pool
 
-_COMPILER_VERSION = "0.10.0"
+_COMPILER_VERSION = "0.10.1"
 betterproto2.check_compiler_version(_COMPILER_VERSION)
 
 
@@ -118,18 +118,19 @@ class Timestamp(betterproto2.Message):
         1, betterproto2.TYPE_INT64
     )
     """
-    Represents seconds of UTC time since Unix epoch
-    1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
-    9999-12-31T23:59:59Z inclusive.
+    Represents seconds of UTC time since Unix epoch 1970-01-01T00:00:00Z. Must
+    be between -315576000000 and 315576000000 inclusive (which corresponds to
+    0001-01-01T00:00:00Z to 9999-12-31T23:59:59Z).
     """
 
     nanos: "typing.Annotated[int, pydantic.Field(ge=-2**31, le=2**31 - 1)]" = betterproto2.field(
         2, betterproto2.TYPE_INT32
     )
     """
-    Non-negative fractions of a second at nanosecond resolution. Negative
-    second values with fractions must still have non-negative nanos values
-    that count forward in time. Must be from 0 to 999,999,999
+    Non-negative fractions of a second at nanosecond resolution. This field is
+    the nanosecond portion of the duration, not an alternative to seconds.
+    Negative second values with fractions must still have non-negative nanos
+    values that count forward in time. Must be between 0 and 999,999,999
     inclusive.
     """
 
