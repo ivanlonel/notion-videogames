@@ -433,9 +433,9 @@ multidict==6.7.1 \
     # via
     #   aiohttp
     #   yarl
-notion-client==2.5.0 \
-    --hash=sha256:a03a0cc0502292193527af07a3bd13e40eb2b1083b60dcc7d733baad2d2729fd \
-    --hash=sha256:d2efde1def1e7a3cc68cf4d2cab715571c71767852b26bf04474e9945d4a5903
+notion-client==3.1.0 \
+    --hash=sha256:516e31326f855ec34559289b57be4e27ad656062f51f594c8f4ee3a608ee333d \
+    --hash=sha256:7e3935f4dbc11231d8ad1fe404112e278501520342eaa35f86456f0df44a8aca
     # via
     #   notion-videogames
     #   ultimate-notion
@@ -811,9 +811,9 @@ tzdata==2026.2 \
     --hash=sha256:9173fde7d80d9018e02a662e168e5a2d04f87c41ea174b139fbef642eda62d10 \
     --hash=sha256:bbe9af844f658da81a5f95019480da3a89415801f6cc966806612cc7169bffe7
     # via pendulum
-ultimate-notion==0.9.11 \
-    --hash=sha256:54437e199bb5fca13ed1d3adbab3024e3fea417bcdd7e65472ec56007c01df3f \
-    --hash=sha256:82da792dd7eb34724b4c0ecf1ff48d0a8312f2e194a5b27c5698c53cfee3fa1f
+ultimate-notion==0.10.1 \
+    --hash=sha256:80e1a4bceca76cf287f48514c79352e1f672701fc77b4a830acf48eb05d616bc \
+    --hash=sha256:9a5d4ed323f03ba53e20978754481f5d3527d0b09b372688910a1c2351ed8a94
     # via notion-videogames
 url-normalize==3.0.0 \
     --hash=sha256:0552cbf2831a32a28994a13d29bca58a60e10ff6c0380e343ec6d1c2a0d232d8 \

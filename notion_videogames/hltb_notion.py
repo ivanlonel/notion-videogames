@@ -184,7 +184,7 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame]):
             raise ValueError(msg)
 
         return next(
-            iter(cls.schema.get_db().query.filter(uno.prop("ID") == data.game_id).execute()), None
+            iter(cls.schema.get_ds().query.filter(uno.prop("ID") == data.game_id).execute()), None
         )
 
     @override

@@ -191,7 +191,7 @@ class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame]):
             raise ValueError(msg)
 
         return next(
-            iter(cls.schema.get_db().query.filter(uno.prop("ID") == data.appid).execute()), None
+            iter(cls.schema.get_ds().query.filter(uno.prop("ID") == data.appid).execute()), None
         )
 
     @override

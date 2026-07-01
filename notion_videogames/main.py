@@ -160,13 +160,13 @@ def get_url_path_parts(urls: Iterable[str | bytes]) -> dict[str | None, list[tup
     return d
 
 
-def rebind_db(database: uno.Database, schema: type[uno.Schema]) -> None:
+def rebind_db(data_source: uno.DataSource, schema: type[uno.Schema]) -> None:
     """Add options from (Multi)Select properties of previously-bound DB to schema and bind them."""
     for schema_prop in schema.get_props():
         if not isinstance(schema_prop, (Select, MultiSelect)):
             continue
 
-        db_prop = database.schema.get_prop(schema_prop.name)
+        db_prop = data_source.schema.get_prop(schema_prop.name)
         if not isinstance(db_prop, (Select, MultiSelect)):
             # Ignore this, let bind_db do the complaining
             continue
@@ -184,7 +184,7 @@ def rebind_db(database: uno.Database, schema: type[uno.Schema]) -> None:
         obj_options.extend(opt.obj_ref for opt in db_prop.options)
         obj_options.extend(opt for opt in obj_options_copy if opt not in obj_options)
 
-    schema.bind_db(database)
+    schema.bind_ds(data_source)
 
 
 if __name__ == "__main__":
@@ -205,7 +205,11 @@ if __name__ == "__main__":
 
     # Initialize Notion client
     with uno.Session.get_or_create() as notion_session:
-        pages: list[uno.Page] = list(notion_session.get_db(SOURCE_DB_ID).get_all_pages())
+        pages: list[uno.Page] = [
+            page
+            for src in notion_session.get_db(SOURCE_DB_ID).data_sources
+            for page in src.get_all_pages()
+        ]
 
         url_path_parts = get_url_path_parts(str(page.props["URL"]) for page in pages)
 
@@ -253,14 +257,14 @@ if __name__ == "__main__":
 
         root_page = notion_session.get_page(MAIN_PAGE_ID)
 
-        databases = {db.title: db for db in root_page.subdbs if db.title in notion_db_types}
+        data_sources = {ds.title: ds for ds in root_page.sub_dss if ds.title in notion_db_types}
 
         for title, page_type in notion_db_types.items():
-            if title in databases:
-                databases[title] = notion_session.get_db(databases[title].id)
-                rebind_db(databases[title], page_type.schema)
+            if title in data_sources:
+                data_sources[title] = notion_session.get_ds(data_sources[title].id)
+                rebind_db(data_sources[title], page_type.schema)
             else:
-                databases[title] = notion_session.create_db(root_page, schema=page_type.schema)
+                data_sources[title] = notion_session.create_ds(root_page, schema=page_type.schema)
 
         steam_spy = steamspy_notion.SteamSpySession()
         atexit.register(steam_spy.close)
