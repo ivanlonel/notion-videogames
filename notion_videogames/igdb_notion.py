@@ -51,7 +51,7 @@ class IGDBNotionPage(notion.NotionPageType[T]):
             msg = f"{data!r} has no 'id' attribute"
             raise ValueError(msg)
         return next(
-            iter(cls.schema.get_db().query.filter(uno.prop("ID") == data.id).execute()), None
+            iter(cls.schema.get_ds().query.filter(uno.prop("ID") == data.id).execute()), None
         )
 
     @classmethod

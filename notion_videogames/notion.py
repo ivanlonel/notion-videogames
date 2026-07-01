@@ -78,7 +78,7 @@ class NotionPageType[T](abc.ABC):
 
         page = uno.Page.wrap_obj_ref(
             session.api.pages.create(
-                cls.schema.get_db().obj_ref,
+                cls.schema.get_ds().obj_ref,
                 properties=cls.validate_and_build_schema_model(data).to_dict(),
                 cover=None if cover is None else cover.obj_ref,
                 icon=None if icon is None else icon.obj_ref,

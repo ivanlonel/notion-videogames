@@ -11,7 +11,7 @@ repos:
       - id: check-useless-excludes
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.25
+    rev: 0.11.26
     hooks:
       - id: uv-lock
         name: uv-lock (frozen)
@@ -153,7 +153,7 @@ repos:
           - python-dotenv~=1.2
           - requests~=2.34
           - tenacity~=9.1
-          - ultimate-notion~=0.9.11
+          - ultimate-notion~=0.10.1
 
   - repo: local
     hooks:

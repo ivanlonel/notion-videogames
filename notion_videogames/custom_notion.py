@@ -185,7 +185,7 @@ class CustomGamePage(notion.NotionPageType[CustomGame]):
     def retrieve_from_data(cls, data: CustomGame) -> uno.Page | None:
         igdb_page = igdb_notion.Game.retrieve_or_create_from_data(data.igdb)
         return next(
-            iter(cls.schema.get_db().query.filter(uno.prop("IGDB").contains(igdb_page)).execute()),
+            iter(cls.schema.get_ds().query.filter(uno.prop("IGDB").contains(igdb_page)).execute()),
             None,
         )
 
