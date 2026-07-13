@@ -56,13 +56,13 @@ dev = [
   "flake8-use-fstring~=1.4",
   "flake8-useless-assert~=0.4",
   "isort~=8.0",
-  "mypy[faster-cache]~=2.1",
+  "mypy[faster-cache]~=2.2",
   "pep8-naming~=0.15",
   "prek~=0.4",
   "pylint~=4.0",
   "ruff~=0.15",
   "tryceratops~=2.4",
-  "ty~=0.0.56",
+  "ty~=0.0.58",
   "types-requests~=2.33",
 ]
 # This group lists packages that are not installed in the local environment but are used
