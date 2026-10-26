@@ -90,6 +90,7 @@ extend-exclude = [
 lint.select = [ "ALL" ]
 lint.ignore = [
   "COM812", # Trailing comma missing
+  "CPY001", # Missing copyright notice at top of file
   "D1",     # Missing Docstrings (pydocstyle)
   "D203",   # Use a blank line to separate the docstring from the class definition
   "D212",   # Multi-line docstring summary should start at the first line
