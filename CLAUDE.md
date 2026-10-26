@@ -22,6 +22,16 @@ Dependencies are managed with `uv` (lockfile-driven); tasks are exposed through 
 
 There is no test suite in this repo. Don't invent one; if a change calls for verification, run `just qa` and (with credentials present) `just run`.
 
+## Dependency updates
+
+Renovate (`.github/renovate.json`) works together with the **Post-Renovate Hooks** workflow (`.github/workflows/update-dependencies.yml`):
+
+- Renovate bumps the `pyproject.toml` ranges and writes `uv.lock` for each PR's own bumps. The workflow adds the transitive refresh (`uv lock --upgrade`, on the weekly group PR `renovate/pep621-pre-commit` only), then runs `sync-with-uv` → `uv-export` → `pyproject-fmt` and commits the result as `github-actions[bot]`.
+- `gitIgnoredAuthors` lists that bot so Renovate doesn't treat its branches as hand-edited ("PR Edited (Blocked)"), and `vulnerabilityAlerts.rangeStrategy: "bump"` keeps security PRs from being lockfile-only, which would make Renovate and the workflow force-push in a loop. Change neither without the other, and keep the workflow's pinned `commit_author`.
+- Hook `rev`s and every `additional_dependencies` line tagged `# sync-with-uv` are exact `uv.lock` pins owned by sync-with-uv; never hand-edit those versions. Change the range in `pyproject.toml`, re-lock, and let the `sync-with-uv` hook re-pin (`just prek sync-with-uv`). A newly tagged package must be in `uv.lock` (add it to the `dev` or `hooks` group), or sync-with-uv exits 123.
+- mypy, ty and deptry are local `uv run --exact` hooks, so they run in the `uv.lock` environment rather than an isolated one.
+- `constraints.python` in `renovate.json` is the bare `requires-python` floor (`"3.12"`); move the two together.
+
 ## Required environment
 
 `main.py` calls `load_dotenv()` and reads these from `.env` or the shell:
