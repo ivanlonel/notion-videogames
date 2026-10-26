@@ -14,9 +14,11 @@
   // Skip releases that drop the oldest Python requires-python accepts. A bare version, not the
   // ">=3.12" range Renovate extracts from pyproject.toml: pep440 versioning has no subset(), so
   // strict filtering falls back to matches(), which needs a bare version and would drop nearly
-  // every release against a range. Keep it at pyproject.toml's requires-python floor.
+  // every release against a range. A full version, too: Renovate also installs exactly this
+  // Python to run `uv lock`, and "3.12" isn't a release ("tool version not supported", which
+  // surfaces as "spawn uv ENOENT"). Keep it at pyproject.toml's requires-python floor.
   "constraints": {
-    "python": "3.12"
+    "python": "3.12.0"
   },
   "constraintsFiltering": "strict",
   "prHourlyLimit": 5,
