@@ -63,41 +63,41 @@ jobs:
       - name: prek – sync-with-uv (first pass)
         uses: j178/prek-action@v3.1.0
         with:
-          prek-version: "v0.4.10"
+          prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual sync-with-uv
         continue-on-error: true
 
       - name: prek – sync-with-uv (verify)
         uses: j178/prek-action@v3.1.0
         with:
-          prek-version: "v0.4.10"
+          prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual sync-with-uv
 
       - name: prek – uv-export (first pass)
         uses: j178/prek-action@v3.1.0
         with:
-          prek-version: "v0.4.10"
+          prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual uv-export
         continue-on-error: true
 
       - name: prek – uv-export (verify)
         uses: j178/prek-action@v3.1.0
         with:
-          prek-version: "v0.4.10"
+          prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual uv-export
 
       # Make sure Renovate didn't upset pyproject-fmt by, e.g., misaligning comments.
       - name: prek – pyproject-fmt (first pass)
         uses: j178/prek-action@v3.1.0
         with:
-          prek-version: "v0.4.10"
+          prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual pyproject-fmt
         continue-on-error: true
 
       - name: prek – pyproject-fmt (verify)
         uses: j178/prek-action@v3.1.0
         with:
-          prek-version: "v0.4.10"
+          prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual pyproject-fmt
 
       # ── Step 2: Commit any hook-generated changes back to the PR branch ───

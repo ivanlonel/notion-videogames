@@ -13,16 +13,17 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
 ]
 dependencies = [
   "betterproto2~=0.10",
   "howlongtobeatpy~=1.0",
   "igdb-api-v4~=0.3.3",
   "notion-client",           # Let ultimate-notion dictate notion-client's version
-  "pydantic~=2.13.4",
+  "pydantic~=2.14.1",
   "python-dotenv~=1.2",
   "requests~=2.34",
-  "tenacity~=9.1",
+  "tenacity~=9.2",
   "ultimate-notion~=0.10.1",
   "urllib3",                 # Let requests dictate urllib3's version
 ]
@@ -32,10 +33,10 @@ urls.Repository = "https://github.com/ivanlonel/notion-videogames"
 dev = [
   "black~=26.10",
   "deptry~=0.25",
-  "flake8~=7.3",
+  "flake8~=7.4",
   "flake8-2020~=1.8",
   "flake8-absolute-import~=1.0",
-  "flake8-annotations~=3.2",
+  "flake8-annotations~=3.3",
   "flake8-boolean-trap~=1.0",
   "flake8-bugbear~=25.11",
   "flake8-builtins~=3.1",
@@ -44,26 +45,26 @@ dev = [
   "flake8-comprehensions~=3.17",
   "flake8-docstrings~=1.7",
   "flake8-encodings~=0.5",
-  "flake8-implicit-str-concat~=0.6",
+  "flake8-implicit-str-concat~=0.7",
   "flake8-logging~=1.8",
   "flake8-no-pep420~=2.9",
   "flake8-noqa~=1.5",
   "flake8-print~=5.0",
   "flake8-pytest-style~=2.2",
   "flake8-raise~=0.0.5",
-  "flake8-simplify~=0.30",
+  "flake8-simplify~=0.31",
   "flake8-tidy-imports~=4.12",
   "flake8-type-checking~=3.2",
   "flake8-use-fstring~=1.4",
   "flake8-useless-assert~=0.4",
   "isort~=8.0",
-  "mypy[faster-cache]~=2.3",
+  "mypy[faster-cache]~=2.4",
   "pep8-naming~=0.15",
-  "prek~=0.4",
-  "pylint~=4.0",
-  "ruff~=0.15",
+  "prek~=0.5",
+  "pylint~=4.1",
+  "ruff~=0.17",
   "tryceratops~=2.4",
-  "ty~=0.0.61",
+  "ty~=0.0.91",
   "types-requests~=2.33",
 ]
 # This group lists packages that are not installed in the local environment but are used
@@ -72,8 +73,8 @@ dev = [
 # ignores certain interpreter version constraints.
 hooks = [
   "pre-commit-hooks~=6.0",
-  "pyproject-fmt~=2.25",
-  "pyupgrade~=3.21",
+  "pyproject-fmt~=2.30",
+  "pyupgrade~=3.22",
   "sync-with-uv~=0.6",
   "uv~=0.13",
 ]

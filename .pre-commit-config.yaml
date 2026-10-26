@@ -71,12 +71,12 @@ repos:
       - id: text-unicode-replacement-char
 
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.25.3
+    rev: v2.30.3
     hooks:
       - id: pyproject-fmt
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
+    rev: v3.22.0
     hooks:
       - id: pyupgrade
         args:
@@ -100,7 +100,7 @@ repos:
           - pytokens==0.4.1  # sync-with-uv
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.22
+    rev: v0.17.2
     hooks:
       - id: ruff-check
         args:
@@ -109,7 +109,7 @@ repos:
       - id: ruff-format
 
   - repo: https://github.com/PyCQA/flake8
-    rev: 7.3.0
+    rev: 7.4.1
     hooks:
       - id: flake8
         args:
@@ -118,7 +118,7 @@ repos:
         additional_dependencies:
           - flake8-2020==1.8.1  # sync-with-uv
           - flake8-absolute-import==1.0.0.3  # sync-with-uv
-          - flake8-annotations==3.2.0  # sync-with-uv
+          - flake8-annotations==3.3.0  # sync-with-uv
           - flake8-boolean-trap==1.0.1  # sync-with-uv
           - flake8-bugbear==25.11.29  # sync-with-uv
           - flake8-builtins==3.1.0  # sync-with-uv
@@ -127,14 +127,14 @@ repos:
           - flake8-comprehensions==3.17.0  # sync-with-uv
           - flake8-docstrings==1.7.0  # sync-with-uv
           - flake8-encodings==0.5.1  # sync-with-uv
-          - flake8-implicit-str-concat==0.6.0  # sync-with-uv
+          - flake8-implicit-str-concat==0.7.0  # sync-with-uv
           - flake8-logging==1.8.0  # sync-with-uv
           - flake8-no-pep420==2.9.0  # sync-with-uv
           - flake8-noqa==1.5.0  # sync-with-uv
           - flake8-print==5.0.0  # sync-with-uv
           - flake8-pytest-style==2.2.0  # sync-with-uv
           - flake8-raise==0.0.5  # sync-with-uv
-          - flake8-simplify==0.30.0  # sync-with-uv
+          - flake8-simplify==0.31.1  # sync-with-uv
           - flake8-tidy-imports==4.12.0  # sync-with-uv
           - flake8-type-checking==3.2.0  # sync-with-uv
           - flake8-use-fstring==1.4  # sync-with-uv
@@ -148,18 +148,18 @@ repos:
           - flake8-helper==0.2.2  # sync-with-uv
           - flake8-plugin-utils==1.3.3  # sync-with-uv
           - mccabe==0.7.0  # sync-with-uv
-          - pycodestyle==2.14.0  # sync-with-uv
+          - pycodestyle==2.15.0  # sync-with-uv
           - pydocstyle==6.3.0  # sync-with-uv
-          - pyflakes==3.4.0  # sync-with-uv
+          - pyflakes==4.0.3  # sync-with-uv
           - snowballstemmer==3.1.1  # sync-with-uv
 
   - repo: https://github.com/PyCQA/pylint
-    rev: v4.0.6
+    rev: v4.1.3
     hooks:
       - id: pylint
         # pylint's inference and import-order engines, pinned so they change only with uv.lock.
         additional_dependencies:
-          - astroid==4.0.4  # sync-with-uv
+          - astroid==4.3.4  # sync-with-uv
           - isort==8.0.1  # sync-with-uv
           - mccabe==0.7.0  # sync-with-uv
 
