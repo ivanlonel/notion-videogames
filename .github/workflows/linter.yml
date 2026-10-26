@@ -23,6 +23,6 @@ jobs:
         uses: astral-sh/setup-uv@v10.3.0
 
       - name: Run prek
-        uses: j178/prek-action@v3.0.1
+        uses: j178/prek-action@v3.1.0
         with:
           extra-args: --all-files --verbose
