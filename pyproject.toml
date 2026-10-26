@@ -75,7 +75,7 @@ hooks = [
   "pyproject-fmt~=2.25",
   "pyupgrade~=3.21",
   "sync-with-uv~=0.6",
-  "uv~=0.11",
+  "uv~=0.13",
 ]
 
 [tool.black]
