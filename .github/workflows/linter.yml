@@ -25,4 +25,5 @@ jobs:
       - name: Run prek
         uses: j178/prek-action@v3.1.0
         with:
+          prek-version: "v0.4.10"
           extra-args: --all-files --verbose

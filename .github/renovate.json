@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    ":configMigration"
+    ":configMigration",
+    "helpers:pinGitHubActionDigests"
   ],
   "timezone": "America/Sao_Paulo",
   "schedule": [
@@ -10,6 +11,14 @@
     "* 0-7 * * 1"
   ],
   "minimumReleaseAge": "1 day",
+  // Skip releases that drop the oldest Python requires-python accepts. A bare version, not the
+  // ">=3.12" range Renovate extracts from pyproject.toml: pep440 versioning has no subset(), so
+  // strict filtering falls back to matches(), which needs a bare version and would drop nearly
+  // every release against a range. Keep it at pyproject.toml's requires-python floor.
+  "constraints": {
+    "python": "3.12"
+  },
+  "constraintsFiltering": "strict",
   "prHourlyLimit": 5,
   // Automatically merge updates if CI build status is passing.
   "automerge": true,
@@ -25,6 +34,41 @@
   "pre-commit": {
     "enabled": true
   },
+  // main's ruleset doesn't require branches to be up to date: with it, GitHub's native
+  // auto-merge never refreshes a stale branch, so each merge stalled every sibling PR until the
+  // next Renovate run rebased it (and human PRs forever). Rebasing a PR that's merely behind
+  // would only re-run CI, and main's own push CI covers the combination. Not the "auto"
+  // default: that resolves to behind-base-branch here through automerge=true.
+  "rebaseWhen": "conflicted",
+  // The Post-Renovate Hooks workflow commits the sync-with-uv / uv-export / pyproject-fmt
+  // results onto pep621 + pre-commit branches as github-actions[bot] (author and committer).
+  // Renovate counts a branch carrying a foreign commit author OR committer as modified and then
+  // stops updating it (the Dependency Dashboard's "PR Edited (Blocked)", where #47 and #51 sat
+  // for months). The flip side: Renovate is then free to rebuild such a branch, dropping that
+  // commit for the workflow to re-add, so no pep621 update may be lockfile-only (see
+  // vulnerabilityAlerts below).
+  "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
+  // Raise PRs for known vulnerabilities from the osv.dev database, independent of the schedule.
+  "osvVulnerabilityAlerts": true,
+  // Security PRs default to rangeStrategy "update-lockfile" (a uv.lock-only change), which is
+  // forced over the pep621 rule below. pep621 has no updateLockedDependency, so Renovate can't
+  // tell that such a branch is still current: once the Post-Renovate Hooks commit lands, every
+  // run re-locks against the base branch's uv.lock, sees a change and rebuilds the branch from
+  // main without that commit, which the workflow then re-adds -- an endless force-push loop.
+  // With a bumped range, Renovate finds the bump already on the branch and leaves it alone, as
+  // on every other pep621 PR.
+  "vulnerabilityAlerts": {
+    "rangeStrategy": "bump"
+  },
+  // The weekly `uv lock --upgrade`, which keeps transitive dependencies that no other Renovate
+  // PR touches current instead of piling up as Dependabot alerts, runs in the Post-Renovate
+  // Hooks workflow on the weekly "pep621 and pre-commit" PR instead. There sync-with-uv re-pins
+  // the hooks to the refreshed lock in the same commit. Renovate's own maintenance branch is
+  // lockfile-only, so it would be rebuilt on every run once that commit landed, and its pins
+  // would lag the lock.
+  "lockFileMaintenance": {
+    "enabled": false
+  },
   "packageRules": [
     {
       "matchDepNames": [
@@ -34,9 +78,10 @@
       "enabled": false
     },
     {
-      // Don't suggest upgrades for the pre-commit repos themselves. That's done
-      // by sync-with-uv in the workflow. Renovate's pre-commit manager should
-      // only offer upgrades for packages in additional_dependencies fields.
+      // Don't suggest upgrades for the pre-commit repos themselves. That's done by sync-with-uv
+      // in the workflow, which mirrors each repo's rev from the tool pinned in uv.lock, so a
+      // Renovate PR would only fight it. The next rule carves out the repos whose tool ISN'T in
+      // uv.lock, which sync-with-uv can't keep current.
       "matchManagers": [
         "pre-commit"
       ],
@@ -46,6 +91,21 @@
       "enabled": false
     },
     {
+      // Re-enable the pre-commit repos with no uv.lock-pinned tool for sync-with-uv to track
+      // (no PyPI distribution), so Renovate owns their rev bumps. Keep this list aligned with
+      // .pre-commit-config.yaml.
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchDepTypes": [
+        "repository"
+      ],
+      "matchDepNames": [
+        "pre-commit/pygrep-hooks"
+      ],
+      "enabled": true
+    },
+    {
       "matchManagers": [
         "pre-commit"
       ],
@@ -62,17 +122,15 @@
       ]
     },
     {
+      // One PR for the week's action bumps instead of one per action. Majors still get a
+      // separate "(major)" group PR: separateMajorMinor outranks packageRule groups.
       "matchManagers": [
         "github-actions"
       ],
       "addLabels": [
         "github-actions"
-      ]
-    },
-    {
-      "matchPackageNames": ["pydantic"],
-      "allowedVersions": "<2.13",
-      "description": "Until https://github.com/ultimate-notion/ultimate-notion/issues/189 is fixed"
+      ],
+      "groupName": "github-actions"
     },
     {
       // Group pep621 and pre-commit updates into a single PR so the pre-commit
@@ -84,10 +142,22 @@
       "groupName": "pep621 and pre-commit",
       "groupSlug": "pep621-pre-commit",
       // Bump the range even if the new version satisfies the existing range.
-      "rangeStrategy": "bump",
-      // Don't update uv.lock as an artifact. That's done by
-      // the uv-lock-upgrade pre-commit hook in the workflow.
-      "skipArtifactsUpdate": true
+      "rangeStrategy": "bump"
+    },
+    {
+      // prek-action installs prek at `latest` unless told otherwise, so its `prek-version`
+      // input is pinned to uv.lock's prek. The github-actions manager tracks that input
+      // natively (as `prek`, from j178/prek's v-prefixed GitHub releases), and this rule,
+      // placed after the github-actions group, moves it with the dev group's prek in the
+      // same PR.
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "prek"
+      ],
+      "groupName": "pep621 and pre-commit",
+      "groupSlug": "pep621-pre-commit"
     }
   ]
 }
