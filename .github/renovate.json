@@ -80,13 +80,27 @@
     {
       // Don't suggest upgrades for the pre-commit repos themselves. That's done by sync-with-uv
       // in the workflow, which mirrors each repo's rev from the tool pinned in uv.lock, so a
-      // Renovate PR would only fight it. The next rule carves out the repos whose tool ISN'T in
+      // Renovate PR would only fight it. A rule below carves out the repos whose tool ISN'T in
       // uv.lock, which sync-with-uv can't keep current.
       "matchManagers": [
         "pre-commit"
       ],
       "matchDepTypes": [
         "repository"
+      ],
+      "enabled": false
+    },
+    {
+      // Same for the Python additional_dependencies: every one carries a `# sync-with-uv`
+      // pragma, so sync-with-uv pins it to its exact uv.lock version (pep621 bumps the ranges in
+      // pyproject.toml). That keeps each hook environment from re-resolving to newer releases on
+      // a cache miss, so a checker only changes on the PR that changes uv.lock, where it then
+      // runs on every file.
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchDepTypes": [
+        "pre-commit-python"
       ],
       "enabled": false
     },
@@ -133,8 +147,8 @@
       "groupName": "github-actions"
     },
     {
-      // Group pep621 and pre-commit updates into a single PR so the pre-commit
-      // additional_dependencies and pyproject.toml deps land together.
+      // Group pep621 and pre-commit updates into a single PR, which the Post-Renovate Hooks
+      // workflow completes with the hook revs and pins sync-with-uv derives from uv.lock.
       "matchManagers": [
         "pep621",
         "pre-commit"
