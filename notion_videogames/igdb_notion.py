@@ -1,6 +1,7 @@
 # pylint: disable=too-many-lines
 from __future__ import annotations
 
+import abc
 import functools
 import itertools
 import urllib.parse
@@ -43,7 +44,9 @@ def add_https_scheme(url: str) -> str:
     return urllib.parse.urlunparse(("https", *parsed_url[1:]))
 
 
-class IGDBNotionPage(notion.NotionPageType[T]):
+# Abstract: get_populated_properties_dict is left to each IGDB page type. Listing abc.ABC directly
+# says so to pylint, which doesn't count indirect ABC subclasses as abstract.
+class IGDBNotionPage(notion.NotionPageType[T], abc.ABC):
     @override
     @classmethod
     def retrieve_from_data(cls, data: T) -> uno.Page | None:
