@@ -20,7 +20,7 @@ dependencies = [
   "howlongtobeatpy~=1.0",
   "igdb-api-v4~=0.3.3",
   "notion-client",           # Let ultimate-notion dictate notion-client's version
-  "pydantic~=2.14.1",
+  "pydantic~=2.14.2",
   "python-dotenv~=1.2",
   "requests~=2.34",
   "tenacity~=9.2",
@@ -33,12 +33,12 @@ urls.Repository = "https://github.com/ivanlonel/notion-videogames"
 dev = [
   "black~=26.10",
   "deptry~=0.25",
-  "flake8~=7.4",
+  "flake8~=7.5",
   "flake8-2020~=1.8",
   "flake8-absolute-import~=1.0",
   "flake8-annotations~=3.3",
   "flake8-boolean-trap~=1.0",
-  "flake8-bugbear~=26.9",
+  "flake8-bugbear~=26.10",
   "flake8-builtins~=3.1",
   "flake8-classmethod-staticmethod~=2.1",
   "flake8-cognitive-complexity~=0.1",
@@ -64,7 +64,7 @@ dev = [
   "pylint~=4.1",
   "ruff~=0.17",
   "tryceratops~=2.4",
-  "ty~=0.0.91",
+  "ty~=0.0.95",
   "types-requests~=2.33",
 ]
 # This group lists packages that are not installed in the local environment but are used
