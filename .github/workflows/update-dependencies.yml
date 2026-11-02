@@ -26,14 +26,14 @@ jobs:
 
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Check out the actual PR branch so we can push changes back to it.
           ref: ${{ github.head_ref }}
           token: ${{ secrets.RENOVATE_TOKEN }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           # Persist uv's download cache across runs (rolling restore-keys).
           enable-cache: true
@@ -61,48 +61,48 @@ jobs:
       #
       # prek-version is pinned to uv.lock's prek; Renovate moves it with the dev group's prek.
       - name: prek – sync-with-uv (first pass)
-        uses: j178/prek-action@v3.1.0
+        uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
         with:
           prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual sync-with-uv
         continue-on-error: true
 
       - name: prek – sync-with-uv (verify)
-        uses: j178/prek-action@v3.1.0
+        uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
         with:
           prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual sync-with-uv
 
       - name: prek – uv-export (first pass)
-        uses: j178/prek-action@v3.1.0
+        uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
         with:
           prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual uv-export
         continue-on-error: true
 
       - name: prek – uv-export (verify)
-        uses: j178/prek-action@v3.1.0
+        uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
         with:
           prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual uv-export
 
       # Make sure Renovate didn't upset pyproject-fmt by, e.g., misaligning comments.
       - name: prek – pyproject-fmt (first pass)
-        uses: j178/prek-action@v3.1.0
+        uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
         with:
           prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual pyproject-fmt
         continue-on-error: true
 
       - name: prek – pyproject-fmt (verify)
-        uses: j178/prek-action@v3.1.0
+        uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
         with:
           prek-version: "v0.5.7"
           extra-args: --all-files --verbose --hook-stage manual pyproject-fmt
 
       # ── Step 2: Commit any hook-generated changes back to the PR branch ───
       - name: Commit changes
-        uses: stefanzweifel/git-auto-commit-action@v7
+        uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # v7
         with:
           commit_message: "chore(deps): apply post-Renovate hooks"
           # Pin the author (default: github.actor). The run triggered by this job's own push
