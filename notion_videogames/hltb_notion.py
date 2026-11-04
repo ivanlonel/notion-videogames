@@ -149,7 +149,7 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame], schema=HLTBNotion
     def get_populated_properties_dict(
         cls, data: HowLongToBeatGame
     ) -> dict[str, props.PropertyValue]:
-        return {
+        properties: dict[str, props.PropertyValue] = {
             "ID": props.Number(data.game_id),
             "Name": props.Title(data.game_name),
             "Alias": props.Text(data.game_alias),
@@ -174,9 +174,7 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame], schema=HLTBNotion
             "Count Playing": props.Number(data.count_playing),
             "Count Retired": props.Number(data.count_retired),
             "Popularity": props.Number(data.profile_popular),
-            "Steam ID": props.Number(data.profile_steam),
             "Release Year": props.Number(data.release_world),
-            "Profile Devs": props.MultiSelect(data.profile_devs),
             "Profile Platforms": props.MultiSelect(data.profile_platforms),
             "Image URL": props.URL(data.game_image_url),
             "URL": props.URL(data.game_web_link),
@@ -186,8 +184,16 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame], schema=HLTBNotion
             "comp_lvl_sp": props.Number(data.comp_lvl_sp),
             "comp_lvl_co": props.Number(data.comp_lvl_co),
             "comp_lvl_mp": props.Number(data.comp_lvl_mp),
-            "comp_lvl_spd": props.Number(data.comp_lvl_spd),
         }
+        # HLTB's API stopped sending these. Writing their empty defaults would wipe what older
+        # pages hold, and it can't be fetched again.
+        if data.profile_steam is not None:
+            properties["Steam ID"] = props.Number(data.profile_steam)
+        if data.profile_devs:
+            properties["Profile Devs"] = props.MultiSelect(data.profile_devs)
+        if data.comp_lvl_spd is not None:
+            properties["comp_lvl_spd"] = props.Number(data.comp_lvl_spd)
+        return properties
 
     @override
     @classmethod
