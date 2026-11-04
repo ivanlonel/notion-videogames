@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Offline checks: no network, no credentials, no Notion."""
 
 from __future__ import annotations
@@ -982,3 +983,46 @@ def test_find_imported_follows_the_library_relations(monkeypatch: pytest.MonkeyP
     assert custom_notion.find_imported() == custom_notion.Imported(
         frozenset({1}), frozenset({"hades"}), frozenset({"1145360"})
     )
+
+
+PLAYTIME_COLUMNS = {"Average Forever", "Average 2 Weeks", "Median Forever", "Median 2 Weeks"}
+
+
+def test_steam_spy_reporting_no_playtime_keeps_what_pages_already_hold() -> None:
+    properties = steamspy_notion.SteamSpyNotionPage.get_populated_properties_dict(
+        steamspy_notion.SteamSpyGame.from_dict(STEAMSPY_KNOWN_APP)
+    )
+
+    assert not PLAYTIME_COLUMNS & set(properties)
+    assert properties["CCU"].value == STEAMSPY_KNOWN_APP["ccu"]
+
+
+def test_steam_spy_playtime_is_written_when_reported() -> None:
+    properties = steamspy_notion.SteamSpyNotionPage.get_populated_properties_dict(
+        steamspy_notion.SteamSpyGame.from_dict(STEAMSPY_KNOWN_APP | {"average_forever": 430})
+    )
+
+    assert properties["Average Forever"].value == 430
+    assert not PLAYTIME_COLUMNS - {"Average Forever"} & set(properties)
+
+
+def test_hltb_fields_it_no_longer_sends_keep_what_pages_already_hold() -> None:
+    properties = hltb_notion.HLTBNotionPage.get_populated_properties_dict(
+        hltb_notion.HowLongToBeatGame.from_dict(HLTB_ENTRY | {"similarity": 1.0})
+    )
+
+    assert not {"Steam ID", "Profile Devs", "comp_lvl_spd"} & set(properties)
+    assert properties["Profile Platforms"].value
+
+
+def test_hltb_fields_are_written_when_sent() -> None:
+    properties = hltb_notion.HLTBNotionPage.get_populated_properties_dict(
+        hltb_notion.HowLongToBeatGame.from_dict(
+            HLTB_ENTRY
+            | {"similarity": 1.0, "profile_steam": 620, "profile_dev": "Valve", "comp_lvl_spd": 1}
+        )
+    )
+
+    assert properties["Steam ID"].value == 620
+    assert properties["comp_lvl_spd"].value == 1
+    assert "Profile Devs" in properties

@@ -152,7 +152,15 @@ class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame], schema=SteamSpyNot
     @override
     @classmethod
     def get_populated_properties_dict(cls, data: SteamSpyGame) -> dict[str, props.PropertyValue]:
-        return {
+        # Steam Spy stopped reporting playtime around April 2026 and now answers 0 for every game.
+        # Writing that would wipe figures that older pages hold and that can't be fetched again.
+        playtimes = {
+            "Average Forever": data.average_forever,
+            "Average 2 Weeks": data.average_2weeks,
+            "Median Forever": data.median_forever,
+            "Median 2 Weeks": data.median_2weeks,
+        }
+        return {name: props.Number(minutes) for name, minutes in playtimes.items() if minutes} | {
             "ID": props.Number(data.appid),
             "Name": props.Title(data.name),
             "Developer": props.Text(data.developer),
@@ -162,10 +170,6 @@ class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame], schema=SteamSpyNot
             "Negative": props.Number(data.negative),
             "User Score": props.Number(data.userscore),
             "Owners": props.Text(data.owners),
-            "Average Forever": props.Number(data.average_forever),
-            "Average 2 Weeks": props.Number(data.average_2weeks),
-            "Median Forever": props.Number(data.median_forever),
-            "Median 2 Weeks": props.Number(data.median_2weeks),
             "Price": props.Number(data.price),
             "Initial Price": props.Number(data.initialprice),
             "Discount": props.Number(data.discount),

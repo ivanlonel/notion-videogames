@@ -35,7 +35,8 @@ uv run notion-videogames --update    # Also refresh pages that already exist
 
 The first run creates the databases, which takes a while. So does a new game, whose related
 companies, platforms, screenshots and so on each become a page: Notion allows about three requests
-per second.
+per second. `--update` takes longest, because it also rewrites every page related to each game: 16
+games took about half an hour.
 
 ## What to expect
 
@@ -43,6 +44,9 @@ per second.
   picks up where it stopped. Existing pages aren't touched unless you pass `--update`.
 - **`--update` keeps what it can't replace.** If a lookup fails or finds nothing, the link already
   on the page stays. Your own columns are never written to.
+- **Steam playtime only goes as far as what you already have.** Steam Spy stopped reporting playtime
+  around April 2026, so newer games leave those columns empty, and `--update` keeps the figures on
+  older pages instead of overwriting them with zeros.
 - **Add your own columns.** Columns you add to the generated databases in Notion are left alone.
   Renaming, retyping or removing the ones this tool created makes the next run stop with an error
   listing the differences, because it would no longer know where to write.
