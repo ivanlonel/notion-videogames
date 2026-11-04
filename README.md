@@ -15,7 +15,8 @@ You need [uv](https://docs.astral.sh/uv/) (and, optionally, [just](https://just.
 1. Create a [Notion integration](https://www.notion.so/my-integrations). Share with it both the
    database listing your games and the page that will hold the generated databases.
 2. Register a [Twitch application](https://api-docs.igdb.com/#account-creation) to access IGDB.
-3. Copy `.env.example` to `.env` and fill it in.
+3. Copy `.env.example` to `.env` and fill it in. It's read from the folder you run the command in,
+   or the nearest parent folder that has one.
 4. Run `uv sync`.
 
 The database listing your games needs a URL property called `URL`, with links like
