@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 import ultimate_notion as uno
-from pydantic.dataclasses import dataclass
 from ultimate_notion import PropType, props
 
 from notion_videogames import hltb_notion, igdb_notion, notion, steamspy_notion
 
 if TYPE_CHECKING:
+    from ultimate_notion.query import Condition
+
     from notion_videogames.proto import proto
 
 
@@ -158,35 +160,34 @@ class CustomGamePageSchema(uno.Schema):
     )
 
 
-class CustomGamePage(notion.NotionPageType[CustomGame]):
-    schema = CustomGamePageSchema  # type: ignore[mutable-override]
+class CustomGamePage(notion.NotionPageType[CustomGame], schema=CustomGamePageSchema):
+    @override
+    @classmethod
+    def get_id(cls, data: CustomGame) -> int:
+        return data.igdb.id
 
     @override
     @classmethod
     def get_populated_properties_dict(cls, data: CustomGame) -> dict[str, props.PropertyValue]:
-        return {
+        properties: dict[str, props.PropertyValue] = {
             "Name": props.Title(data.igdb.name),
             "IGDB": props.Relations(igdb_notion.Game.retrieve_or_create_from_data(data.igdb)),
-            "How Long to Beat": props.Relations(
-                [hltb_notion.HLTBNotionPage.retrieve_or_create_from_data(data.hltb)]
-                if data.hltb
-                else []
-            ),
-            "Steam Spy": props.Relations(
-                [steamspy_notion.SteamSpyNotionPage.retrieve_or_create_from_data(data.steamspy)]
-                if data.steamspy
-                else []
-            ),
         }
+        # A missing match may be a failed lookup: leave any link an earlier run made untouched.
+        if data.hltb is not None:
+            properties["How Long to Beat"] = props.Relations(
+                hltb_notion.HLTBNotionPage.retrieve_or_create_from_data(data.hltb)
+            )
+        if data.steamspy is not None:
+            properties["Steam Spy"] = props.Relations(
+                steamspy_notion.SteamSpyNotionPage.retrieve_or_create_from_data(data.steamspy)
+            )
+        return properties
 
     @override
     @classmethod
-    def retrieve_from_data(cls, data: CustomGame) -> uno.Page | None:
-        igdb_page = igdb_notion.Game.retrieve_or_create_from_data(data.igdb)
-        return next(
-            iter(cls.schema.get_ds().query.filter(uno.prop("IGDB").contains(igdb_page)).execute()),
-            None,
-        )
+    def get_lookup_condition(cls, data: CustomGame) -> Condition:
+        return uno.prop("IGDB").contains(igdb_notion.Game.retrieve_or_create_from_data(data.igdb))
 
     @override
     @classmethod

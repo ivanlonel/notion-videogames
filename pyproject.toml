@@ -18,6 +18,7 @@ classifiers = [
 dependencies = [
   "betterproto2~=0.10",
   "howlongtobeatpy~=1.0",
+  "httpx",                   # Let notion-client dictate httpx's version
   "igdb-api-v4~=0.3.3",
   "notion-client",           # Let ultimate-notion dictate notion-client's version
   "pydantic~=2.14.2",
@@ -120,6 +121,9 @@ ignore-paths = [
 [tool.deptry]
 extend_exclude = [
   "notion_videogames.proto",
+]
+per_rule_ignores.DEP002 = [
+  "betterproto2", # Only the generated proto package imports it
 ]
 
 [tool.mypy]
