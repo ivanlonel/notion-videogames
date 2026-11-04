@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import logging
 from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
@@ -158,8 +157,8 @@ class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame]):
     schema = SteamSpyNotionPageSchema  # type: ignore[mutable-override]
 
     @override
-    @staticmethod
-    def get_populated_properties_dict(data: SteamSpyGame) -> dict[str, props.PropertyValue]:
+    @classmethod
+    def get_populated_properties_dict(cls, data: SteamSpyGame) -> dict[str, props.PropertyValue]:
         return {
             "ID": props.Number(data.appid),
             "Name": props.Title(data.name),
@@ -196,17 +195,9 @@ class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame]):
 
     @override
     @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: SteamSpyGame,
-        *,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> uno.Page:
+    def get_image_urls(cls, data: SteamSpyGame) -> tuple[str | None, str | None]:
         base_url = "https://shared.cloudflare.steamstatic.com/store_item_assets"
-        return super().retrieve_or_create_from_data(
-            data,
-            icon_url=icon_url or f"{base_url}/steam/apps/{data.appid}/logo.png",
-            cover_url=cover_url or f"{base_url}/steam/apps/{data.appid}/library_hero.jpg",
+        return (
+            f"{base_url}/steam/apps/{data.appid}/logo.png",
+            f"{base_url}/steam/apps/{data.appid}/library_hero.jpg",
         )

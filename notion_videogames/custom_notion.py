@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 from typing import TYPE_CHECKING, override
 
 import ultimate_notion as uno
@@ -163,8 +162,8 @@ class CustomGamePage(notion.NotionPageType[CustomGame]):
     schema = CustomGamePageSchema  # type: ignore[mutable-override]
 
     @override
-    @staticmethod
-    def get_populated_properties_dict(data: CustomGame) -> dict[str, props.PropertyValue]:
+    @classmethod
+    def get_populated_properties_dict(cls, data: CustomGame) -> dict[str, props.PropertyValue]:
         return {
             "Name": props.Title(data.igdb.name),
             "IGDB": props.Relations(igdb_notion.Game.retrieve_or_create_from_data(data.igdb)),
@@ -191,17 +190,5 @@ class CustomGamePage(notion.NotionPageType[CustomGame]):
 
     @override
     @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: CustomGame,
-        *,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> uno.Page:
-        if not icon_url and data.igdb.cover and data.igdb.cover.url:
-            icon_url = igdb_notion.add_https_scheme(data.igdb.cover.url)
-        if not cover_url and icon_url:
-            cover_url = icon_url.replace("/t_thumb/", "/t_cover_big_2x/")
-
-        return super().retrieve_or_create_from_data(data, icon_url=icon_url, cover_url=cover_url)
+    def get_image_urls(cls, data: CustomGame) -> tuple[str | None, str | None]:
+        return igdb_notion.Game.get_image_urls(data.igdb)
