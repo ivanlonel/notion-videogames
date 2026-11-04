@@ -21,7 +21,7 @@ Dependencies are managed with `uv` (lockfile-driven); tasks are exposed through 
 - `just prek [hook]` — run all pre-commit hooks, or a single one (use a hook id like `uv-lock-upgrade` to invoke a manual-stage hook)
 - `just proto` — re-download `igdbapi.proto` and regenerate `notion_videogames/proto/` with `betterproto2` (run this if IGDB updates their schema)
 
-Tests live in one file, `tests/test_offline.py`, and use no network, credentials or Notion. Keep it that way, and add to that file rather than building up a larger suite. Real verification against Notion is `uv run notion-videogames --dry-run` (read-only), then `--limit N`. `--update` edits existing pages, so ask before running it against the user's library.
+Tests live in one file, `tests/test_offline.py`, and use no network, credentials or Notion. Keep it that way, and add to that file rather than building up a larger suite. Real verification against Notion is `uv run notion-videogames --dry-run` (read-only), then `--limit N`. `--update` edits existing pages and every page related to them (16 games took 28 minutes), so ask before running it against the user's library.
 
 On Windows, VS Code language servers running from `.venv` can lock compiled modules, which makes `uv sync` fail with "Acesso negado"/"Access denied" when removing or upgrading one. Reloading the VS Code window releases them.
 
@@ -32,12 +32,14 @@ Renovate (`.github/renovate.json`) works together with the **Post-Renovate Hooks
 - Renovate bumps the `pyproject.toml` ranges and writes `uv.lock` for each PR's own bumps. The workflow adds the transitive refresh (`uv lock --upgrade`, on the weekly group PR `renovate/pep621-pre-commit` only), then runs `sync-with-uv` → `uv-export` → `pyproject-fmt` and commits the result as `github-actions[bot]`.
 - `gitIgnoredAuthors` lists that bot so Renovate doesn't treat its branches as hand-edited ("PR Edited (Blocked)"), and `vulnerabilityAlerts.rangeStrategy: "bump"` keeps security PRs from being lockfile-only, which would make Renovate and the workflow force-push in a loop. Change neither without the other, and keep the workflow's pinned `commit_author`.
 - Hook `rev`s and every `additional_dependencies` line tagged `# sync-with-uv` are exact `uv.lock` pins owned by sync-with-uv; never hand-edit those versions. Change the range in `pyproject.toml`, re-lock, and let the `sync-with-uv` hook re-pin (`just prek sync-with-uv`). A newly tagged package must be in `uv.lock` (add it to the `dev` or `hooks` group), or sync-with-uv exits 123.
-- mypy, ty and deptry are local `uv run --exact` hooks, so they run in the `uv.lock` environment rather than an isolated one.
+- mypy, ty, deptry and pytest are local `uv run --exact` hooks, so they run in the `uv.lock` environment rather than an isolated one, and CI's prek job runs the tests without a workflow of their own.
 - `constraints.python` in `renovate.json` is the `requires-python` floor as a full version (`"3.12.0"`): Renovate filters releases by it and also installs exactly that Python for its `uv lock` runs, so a bare `"3.12"` breaks every lockfile update. Move the two together.
+- `uv-build` in `[build-system]` has an upper bound that has to follow uv's minor version. Renovate's pep621 manager should handle it as one more range, but no bump has come through yet to confirm that.
+- `requirements.txt` is exported with `--no-emit-project`. Without it, the export gains a `-e .` line now that the project is a package.
 
 ## Required environment
 
-`main()` calls `load_dotenv()` and reads these from `.env` or the shell (`.env.example` lists them). `Settings.from_env` names everything missing at once:
+`main()` reads these from the shell or from a `.env` file, searched from the current directory upward (`.env.example` lists them). Plain `load_dotenv()` would search from the calling file's folder instead, which breaks for an installed package and for scripts kept outside the repo. `Settings.from_env` names everything missing at once:
 
 - `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` — Twitch app credentials used to mint an IGDB OAuth token
 - `NOTION_TOKEN` — read by `ultimate_notion` itself, which also accepts a token in its own config file
@@ -76,6 +78,21 @@ A no-op rerun still costs about two GETs per database: `root_page.sub_dss` resol
 - 22 IGDB entity types are dormant: their classes exist and their `DB_PAGE_TYPES` entries are commented out. Enabling one means uncommenting its entry (mind the order) and, for it to be reachable from a game, adding the relation to `GameSchema`.
 - Pages are looked up by their source-system id (IGDB id, HLTB game_id, Steam appid) via `get_lookup_condition`, usually `uno.prop("ID") == cls.get_id(data)` on the bound database.
 - `prop.prop_value` and `prop.readonly` raise on an unbound `Relation`, so use `props.Relations` directly and don't reach for those in offline code.
+
+### What `--update` overwrites
+
+It mirrors the sources, so IGDB removing a value or a list entry clears it in Notion too, and a user's manual edits to the mirror databases are lost. It never writes personal columns or anything outside the schema, and a single relation or date that's absent is left out rather than cleared. Fields a source has stopped sending must be left out as well, because older pages may hold values that can't be fetched again (see below). Don't apply that to everything: a blanket "never clear" rule would stop real IGDB removals from syncing.
+
+### Upstream data quirks
+
+Checked against live APIs in November 2026:
+
+- **Steam Spy** stopped reporting playtime around April 2026: `average_*` and `median_*` are 0 for every game, even Counter-Strike 2, while CCU, reviews and owners stay real. `SteamSpyNotionPage` skips zeros so that `--update` can't wipe the figures on about 415 older pages. `score_rank` and `userscore` carry nothing either, on old pages as well as new. Unknown apps answer 200 with `name: null`.
+- **HowLongToBeat** no longer sends `profile_steam`, `profile_dev` or `comp_lvl_spd`, and `HLTBNotionPage` skips them when absent for the same reason. `search` returns `None` for a failed request and `[]` for no results, and a game's alias counts towards similarity, so `OneShot: World Machine Edition` matches the 2016 `OneShot` at 1.0.
+- **IGDB id 0 is real** for tables that used to be enums (`game_types`, `date_formats`, `company_statuses`), so never test an id for truthiness.
+- **Some IGDB companies are named after another company's id**, such as `id=11986` called "70" (Nintendo's real id). A title like `70 - 868` is IGDB's data, not a mapping bug.
+- **12 databases hold a blank `id=0` page** (titles like `0`, `None`, ` - 0`; empty `Checksum`) left by versions from 2024–2025. Older pages still link to them, and `--update` keeps those links because an absent single relation is left out. The current code shouldn't add more, because unset nested messages come back as `None`.
+- With the current Notion sharing, every run logs a `Could not find page` warning. It's `ultimate_notion` looking up a parent page the integration can't see, and it's harmless.
 
 ## Code style notes (in addition to what the tooling enforces)
 
