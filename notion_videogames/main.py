@@ -308,9 +308,10 @@ def fetch_games(
         by_slug = _query_in_batches(igdb.find_games, slugs, summary)
         by_steam_id = _query_in_batches(igdb.find_steam_games, steam_app_ids, summary)
 
-    found = {game.slug for game in by_slug} | {external.uid for external in by_steam_id}
+    accounted_for = {game.slug for game in by_slug} | {external.uid for external in by_steam_id}
+    accounted_for |= set(summary.failed)
     summary.not_on_igdb += [
-        value for value in (*slugs, *steam_app_ids) if value not in found | set(summary.failed)
+        value for value in (*slugs, *steam_app_ids) if value not in accounted_for
     ]
 
     # The same game may be listed under both its IGDB and its Steam URL.
