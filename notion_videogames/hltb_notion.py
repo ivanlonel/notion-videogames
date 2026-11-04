@@ -128,9 +128,13 @@ class HLTBNotionPageSchema(uno.Schema):
     comp_lvl_spd = PropType.Number("comp_lvl_spd")
 
 
-class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame]):
-    schema = HLTBNotionPageSchema  # type: ignore[mutable-override]
+class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame], schema=HLTBNotionPageSchema):
     hltb_wrapper: ClassVar[HowLongToBeat] = HowLongToBeat(0)
+
+    @override
+    @classmethod
+    def get_id(cls, data: HowLongToBeatGame) -> int:
+        return data.game_id
 
     @override
     @classmethod
@@ -176,17 +180,6 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame]):
             "comp_lvl_mp": props.Number(data.comp_lvl_mp),
             "comp_lvl_spd": props.Number(data.comp_lvl_spd),
         }
-
-    @override
-    @classmethod
-    def retrieve_from_data(cls, data: HowLongToBeatGame) -> uno.Page | None:
-        if not hasattr(data, "game_id"):
-            msg = f"{data!r} has no 'game_id' attribute"
-            raise ValueError(msg)
-
-        return next(
-            iter(cls.schema.get_ds().query.filter(uno.prop("ID") == data.game_id).execute()), None
-        )
 
     @override
     @classmethod

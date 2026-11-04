@@ -1500,6 +1500,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "betterproto2" },
     { name = "howlongtobeatpy" },
+    { name = "httpx" },
     { name = "igdb-api-v4" },
     { name = "notion-client" },
     { name = "pydantic" },
@@ -1558,6 +1559,7 @@ hooks = [
 requires-dist = [
     { name = "betterproto2", specifier = "~=0.10" },
     { name = "howlongtobeatpy", specifier = "~=1.0" },
+    { name = "httpx" },
     { name = "igdb-api-v4", specifier = "~=0.3.3" },
     { name = "notion-client" },
     { name = "pydantic", specifier = "~=2.14.2" },

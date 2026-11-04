@@ -5,10 +5,9 @@ import functools
 import logging
 import operator
 import urllib.parse
-from typing import TYPE_CHECKING, Any, ClassVar, Final, NamedTuple, Protocol, cast, override
+from typing import TYPE_CHECKING, Any, ClassVar, Final, NamedTuple, Protocol, override
 
 import ultimate_notion as uno
-from betterproto2 import Message
 from ultimate_notion import PropType, props
 from ultimate_notion.schema import URL, Date, Relation
 
@@ -16,8 +15,6 @@ from notion_videogames import notion
 from notion_videogames.proto import proto
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from ultimate_notion.schema import Property
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -26,15 +23,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 MAX_RELATION_PAGES: Final[int] = 100
 
 LOGO_SIZE: Final[str] = "t_logo_med"
-
-
-# Monkeypatch betterproto2.Message adding a __hash__ method so instances can be used in lru_cache
-if cast("Callable[[object], int] | None", Message.__hash__) is None:
-
-    def _hash(self: Message) -> int:
-        return hash(bytes(self))
-
-    Message.__hash__ = _hash  # type: ignore[assignment] # ty: ignore[invalid-assignment]
 
 
 def add_https_scheme(url: str) -> str:
@@ -83,10 +71,8 @@ class IGDBNotionPage[T: IGDBMessage](notion.NotionPageType[T]):
 
     @override
     @classmethod
-    def retrieve_from_data(cls, data: T) -> uno.Page | None:
-        return next(
-            iter(cls.schema.get_ds().query.filter(uno.prop("ID") == data.id).execute()), None
-        )
+    def get_id(cls, data: T) -> int:
+        return data.id
 
     @staticmethod
     def computed(data: T) -> dict[str, object]:

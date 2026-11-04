@@ -153,8 +153,11 @@ class SteamSpyNotionPageSchema(uno.Schema):
     )
 
 
-class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame]):
-    schema = SteamSpyNotionPageSchema  # type: ignore[mutable-override]
+class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame], schema=SteamSpyNotionPageSchema):
+    @override
+    @classmethod
+    def get_id(cls, data: SteamSpyGame) -> int:
+        return data.appid
 
     @override
     @classmethod
@@ -181,17 +184,6 @@ class SteamSpyNotionPage(notion.NotionPageType[SteamSpyGame]):
             "Genres": props.MultiSelect(data.genres),
             "Tags": props.MultiSelect(data.tags),
         }
-
-    @override
-    @classmethod
-    def retrieve_from_data(cls, data: SteamSpyGame) -> uno.Page | None:
-        if not hasattr(data, "appid"):
-            msg = f"{data!r} has no 'appid' attribute"
-            raise ValueError(msg)
-
-        return next(
-            iter(cls.schema.get_ds().query.filter(uno.prop("ID") == data.appid).execute()), None
-        )
 
     @override
     @classmethod
