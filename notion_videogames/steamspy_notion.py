@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
 import requests
@@ -14,8 +13,6 @@ from notion_videogames import notion
 
 if TYPE_CHECKING:
     from _typeshed import SupportsKeysAndGetItem
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -79,6 +76,7 @@ class SteamSpyGame:  # pylint: disable=too-many-instance-attributes
 
 class SteamSpySession(requests.Session):
     api_url: ClassVar[str] = "https://steamspy.com/api.php"
+    timeout: ClassVar[float] = 30
     retry_policy: ClassVar[urllib3.util.retry.Retry] = urllib3.util.retry.Retry(
         total=7,
         backoff_factor=1.875,
@@ -92,22 +90,14 @@ class SteamSpySession(requests.Session):
         self.mount("https://", requests.adapters.HTTPAdapter(max_retries=self.retry_policy))
 
     def get_steam_spy_data(self, app_id: int) -> SteamSpyGame | None:
+        """Return the app's data, None if Steam Spy doesn't know it. Raise if the request fails."""
         params: dict[str, str | int] = {"request": "appdetails", "appid": app_id}
-        response = self.get(self.api_url, params=params)
+        response = self.get(self.api_url, params=params, timeout=self.timeout)
+        response.raise_for_status()
 
-        logger.info("Steam Spy appdetails response for appid %d: %d", app_id, response.status_code)
-
-        if response.ok:
-            try:
-                json = response.json()
-            except requests.exceptions.JSONDecodeError:
-                logger.exception("Failed to decode JSON response for appid %d", app_id)
-                return None
-        else:
-            logger.error("Non-OK response for appid %d: %d", app_id, response.status_code)
-            return None
-
-        return SteamSpyGame.from_dict(json)
+        data = response.json()
+        # Steam Spy answers 200 with a null name for apps it doesn't know.
+        return SteamSpyGame.from_dict(data) if data.get("name") else None
 
 
 class SteamSpyNotionPageSchema(uno.Schema):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Self, cast, override
+import functools
+from typing import TYPE_CHECKING, Any, Final, Self, cast, override
 
 import ultimate_notion as uno
 from howlongtobeatpy.HowLongToBeat import HowLongToBeat
@@ -13,6 +14,9 @@ from notion_videogames import notion
 if TYPE_CHECKING:
     from _typeshed import SupportsKeysAndGetItem
     from howlongtobeatpy.HowLongToBeatEntry import HowLongToBeatEntry
+
+MIN_SIMILARITY: Final[float] = 0.4
+"""Below this a game counts as missing from HLTB, instead of linking to an unrelated title"""
 
 
 @dataclass(frozen=True)
@@ -128,9 +132,13 @@ class HLTBNotionPageSchema(uno.Schema):
     comp_lvl_spd = PropType.Number("comp_lvl_spd")
 
 
-class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame], schema=HLTBNotionPageSchema):
-    hltb_wrapper: ClassVar[HowLongToBeat] = HowLongToBeat(0)
+@functools.cache
+def _get_wrapper() -> HowLongToBeat:
+    # Not at import time: on Windows, creating one sets a process-wide asyncio event loop policy.
+    return HowLongToBeat(MIN_SIMILARITY)
 
+
+class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame], schema=HLTBNotionPageSchema):
     @override
     @classmethod
     def get_id(cls, data: HowLongToBeatGame) -> int:
@@ -187,14 +195,25 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame], schema=HLTBNotion
         return data.game_image_url, data.game_image_url
 
     @classmethod
-    def get_best_match(cls, name: str, *, ignore_case: bool = True) -> HowLongToBeatGame | None:
-        results: list[HowLongToBeatEntry] | None = cls.hltb_wrapper.search(
-            name, similarity_case_sensitive=not ignore_case
+    def get_best_match(
+        cls, name: str, release_year: int | None = None
+    ) -> HowLongToBeatGame | None:
+        """Return the closest game, None if nothing is close enough. Raise if the search fails."""
+        results: list[HowLongToBeatEntry] | None = _get_wrapper().search(
+            name, similarity_case_sensitive=False
         )
+        if results is None:
+            msg = f"The search for {name!r} failed"
+            raise LookupError(msg)
         if not results:
             return None
 
-        best = max(results, key=lambda element: element.similarity)
+        def closeness(entry: HowLongToBeatEntry) -> tuple[float, int]:
+            # Remakes share a name, so ties go to the release year nearest the game's own.
+            year_gap = abs((entry.release_world or 0) - release_year) if release_year else 0
+            return entry.similarity, -year_gap
+
+        best = max(results, key=closeness)
         return HowLongToBeatGame.from_dict(
             cast("dict[str, Any]", best.json_content) | {"similarity": best.similarity}
         )
