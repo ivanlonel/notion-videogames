@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Final, Self
 
 import requests
 import ultimate_notion as uno
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from notion_client.errors import HTTPResponseError
 from ultimate_notion.config import get_or_create_cfg
 from ultimate_notion.errors import UltimateNotionError
@@ -467,7 +467,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     logging.getLogger("notion_videogames").setLevel(level)
     logger.setLevel(level)  # Named __main__ when run with python -m
 
-    load_dotenv()
+    # By default it searches from this file's folder, which an installed package can't rely on.
+    load_dotenv(find_dotenv(usecwd=True))
     settings = Settings.from_env()
     notion.NotionPageType.update = args.update
 
