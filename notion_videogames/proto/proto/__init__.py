@@ -78,6 +78,8 @@ __all__ = (
     "EventNetwork",
     "EventNetworkResult",
     "EventResult",
+    "Executable",
+    "ExecutableResult",
     "ExternalGame",
     "ExternalGameCategoryEnum",
     "ExternalGameMediaEnum",
@@ -121,6 +123,8 @@ __all__ = (
     "GenderGenderEnum",
     "Genre",
     "GenreResult",
+    "ImageType",
+    "ImageTypeResult",
     "InvolvedCompany",
     "InvolvedCompanyResult",
     "Keyword",
@@ -131,6 +135,8 @@ __all__ = (
     "LanguageSupportResult",
     "LanguageSupportType",
     "LanguageSupportTypeResult",
+    "Logo",
+    "LogoResult",
     "MultiQueryResult",
     "MultiQueryResultArray",
     "MultiplayerMode",
@@ -1073,6 +1079,15 @@ class Artwork(betterproto2.Message):
     artwork_type: "ArtworkType | None" = betterproto2.field(
         10, betterproto2.TYPE_MESSAGE, optional=True
     )
+
+    image_type: "ImageType | None" = betterproto2.field(
+        11, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.is_set("artwork_type"):
+            warnings.warn("Artwork.artwork_type is deprecated", DeprecationWarning)
 
 
 default_message_pool.register_message("proto", "Artwork", Artwork)
@@ -2087,6 +2102,10 @@ class Cover(betterproto2.Message):
         10, betterproto2.TYPE_MESSAGE, optional=True
     )
 
+    image_type: "ImageType | None" = betterproto2.field(
+        11, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
 
 default_message_pool.register_message("proto", "Cover", Cover)
 
@@ -2337,6 +2356,46 @@ class EventResult(betterproto2.Message):
 
 
 default_message_pool.register_message("proto", "EventResult", EventResult)
+
+
+@dataclass(eq=False, repr=False, config={"extra": "forbid"})
+class Executable(betterproto2.Message):
+    id: "typing.Annotated[int, pydantic.Field(ge=0, le=2**64 - 1)]" = betterproto2.field(
+        1, betterproto2.TYPE_UINT64
+    )
+
+    game: "Game | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+
+    name: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        3, betterproto2.TYPE_STRING
+    )
+
+    store: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        4, betterproto2.TYPE_STRING
+    )
+
+    platform: "Platform | None" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, optional=True)
+
+    file_path: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        6, betterproto2.TYPE_STRING
+    )
+
+    checksum: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        7, betterproto2.TYPE_STRING
+    )
+
+
+default_message_pool.register_message("proto", "Executable", Executable)
+
+
+@dataclass(eq=False, repr=False, config={"extra": "forbid"})
+class ExecutableResult(betterproto2.Message):
+    executables: "list[Executable]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
+
+
+default_message_pool.register_message("proto", "ExecutableResult", ExecutableResult)
 
 
 @dataclass(eq=False, repr=False, config={"extra": "forbid"})
@@ -2695,6 +2754,10 @@ class Game(betterproto2.Message):
     )
 
     game_type: "GameType | None" = betterproto2.field(60, betterproto2.TYPE_MESSAGE, optional=True)
+
+    executables: "list[Executable]" = betterproto2.field(
+        61, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -3310,6 +3373,40 @@ default_message_pool.register_message("proto", "GenreResult", GenreResult)
 
 
 @dataclass(eq=False, repr=False, config={"extra": "forbid"})
+class ImageType(betterproto2.Message):
+    id: "typing.Annotated[int, pydantic.Field(ge=0, le=2**64 - 1)]" = betterproto2.field(
+        1, betterproto2.TYPE_UINT64
+    )
+
+    name: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        2, betterproto2.TYPE_STRING
+    )
+
+    created_at: "datetime.datetime | None" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, unwrap=lambda: _google__protobuf__.Timestamp, optional=True
+    )
+
+    updated_at: "datetime.datetime | None" = betterproto2.field(
+        4, betterproto2.TYPE_MESSAGE, unwrap=lambda: _google__protobuf__.Timestamp, optional=True
+    )
+
+    checksum: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        5, betterproto2.TYPE_STRING
+    )
+
+
+default_message_pool.register_message("proto", "ImageType", ImageType)
+
+
+@dataclass(eq=False, repr=False, config={"extra": "forbid"})
+class ImageTypeResult(betterproto2.Message):
+    imagetypes: "list[ImageType]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+
+
+default_message_pool.register_message("proto", "ImageTypeResult", ImageTypeResult)
+
+
+@dataclass(eq=False, repr=False, config={"extra": "forbid"})
 class InvolvedCompany(betterproto2.Message):
     id: "typing.Annotated[int, pydantic.Field(ge=0, le=2**64 - 1)]" = betterproto2.field(
         1, betterproto2.TYPE_UINT64
@@ -3513,6 +3610,54 @@ class LanguageSupportTypeResult(betterproto2.Message):
 default_message_pool.register_message(
     "proto", "LanguageSupportTypeResult", LanguageSupportTypeResult
 )
+
+
+@dataclass(eq=False, repr=False, config={"extra": "forbid"})
+class Logo(betterproto2.Message):
+    id: "typing.Annotated[int, pydantic.Field(ge=0, le=2**64 - 1)]" = betterproto2.field(
+        1, betterproto2.TYPE_UINT64
+    )
+
+    alpha_channel: "bool" = betterproto2.field(2, betterproto2.TYPE_BOOL)
+
+    animated: "bool" = betterproto2.field(3, betterproto2.TYPE_BOOL)
+
+    game: "Game | None" = betterproto2.field(4, betterproto2.TYPE_MESSAGE, optional=True)
+
+    height: "typing.Annotated[int, pydantic.Field(ge=-2**31, le=2**31 - 1)]" = betterproto2.field(
+        5, betterproto2.TYPE_INT32
+    )
+
+    image_id: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        6, betterproto2.TYPE_STRING
+    )
+
+    url: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        7, betterproto2.TYPE_STRING
+    )
+
+    width: "typing.Annotated[int, pydantic.Field(ge=-2**31, le=2**31 - 1)]" = betterproto2.field(
+        8, betterproto2.TYPE_INT32
+    )
+
+    checksum: "typing.Annotated[str, pydantic.AfterValidator(betterproto2.validators.validate_string)]" = betterproto2.field(
+        9, betterproto2.TYPE_STRING
+    )
+
+    image_type: "ImageType | None" = betterproto2.field(
+        10, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+
+default_message_pool.register_message("proto", "Logo", Logo)
+
+
+@dataclass(eq=False, repr=False, config={"extra": "forbid"})
+class LogoResult(betterproto2.Message):
+    logos: "list[Logo]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+
+
+default_message_pool.register_message("proto", "LogoResult", LogoResult)
 
 
 @dataclass(eq=False, repr=False, config={"extra": "forbid"})
