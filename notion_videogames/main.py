@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import atexit
 import collections
 import itertools
 import logging
 import os
 import urllib.parse
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Final, TypedDict
+from typing import TYPE_CHECKING, Any, Final
 
-import requests
 import ultimate_notion as uno
 from dotenv import load_dotenv
-from igdb.wrapper import IGDBWrapper
 from ultimate_notion.schema import MultiSelect, Select
 
 from notion_videogames import (
@@ -22,16 +19,9 @@ from notion_videogames import (
     notion,
     steamspy_notion,
 )
-from notion_videogames.proto import proto
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-    class TwitchOauth2Token(TypedDict):
-        access_token: str
-        expires_in: int
-        token_type: str
-
 
 load_dotenv()
 
@@ -123,33 +113,6 @@ notion_db_types: dict[str, type[notion.NotionPageType[Any]]] = {
 }
 
 
-def get_twitch_oauth2_token(
-    client_id: str,
-    client_secret: str,
-    timeout: float | tuple[float, float] | tuple[float, None] | None = None,
-) -> TwitchOauth2Token:
-    dic: TwitchOauth2Token = requests.post(
-        "https://id.twitch.tv/oauth2/token",
-        params={
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "grant_type": "client_credentials",
-        },
-        timeout=timeout,
-    ).json()
-    return dic
-
-
-def query_igdb_games(wrapper: IGDBWrapper, query: str) -> list[proto.Game]:
-    return proto.GameResult.FromString(wrapper.api_request("games.pb", query)).games
-
-
-def query_igdb_external_games(wrapper: IGDBWrapper, query: str) -> list[proto.ExternalGame]:
-    return proto.ExternalGameResult.FromString(
-        wrapper.api_request("external_games.pb", query)
-    ).externalgames
-
-
 def get_url_path_parts(urls: Iterable[str | bytes]) -> dict[str | None, list[tuple[str, ...]]]:
     d: dict[str | None, list[tuple[str, ...]]] = collections.defaultdict(list)
 
@@ -199,12 +162,10 @@ if __name__ == "__main__":
         _msg = "SOURCE_DB_ID and MAIN_PAGE_ID must be set as environment variables"
         raise ValueError(_msg)
 
-    # IGDB API setup
-    igdb_token = get_twitch_oauth2_token(IGDB_CLIENT_ID, IGDB_CLIENT_SECRET).get("access_token")
-    igdb = IGDBWrapper(IGDB_CLIENT_ID, igdb_token)
+    # Initialize API clients
+    igdb = igdb_notion.IGDBSession(IGDB_CLIENT_ID, IGDB_CLIENT_SECRET)
 
-    # Initialize Notion client
-    with uno.Session.get_or_create() as notion_session:
+    with uno.Session.get_or_create() as notion_session, steamspy_notion.SteamSpySession() as spy:
         pages: list[uno.Page] = [
             page
             for src in notion_session.get_db(SOURCE_DB_ID).data_sources
@@ -216,41 +177,29 @@ if __name__ == "__main__":
         logger.info("Found %d pages in source database.", len(pages))
         logger.info(list(url_path_parts))
 
-        quoted_igdb_slugs = [
-            f'"{parts[2]}"'
+        igdb_slugs = [
+            parts[2]
             for hostname, paths_list in url_path_parts.items()
             if hostname and hostname.rsplit(".", 2)[-2:] == ["igdb", "com"]
             for parts in paths_list
         ]
 
+        # 25 games per request, to avoid HTTP error 504 - gateway timeout
         games = list(
             itertools.chain.from_iterable(
-                query_igdb_games(
-                    igdb,
-                    f"fields {','.join(igdb_notion.Game.get_query_fields())};"
-                    f"where slug=({','.join(batch)});"
-                    "limit 500;",
-                )
-                for batch in itertools.batched(quoted_igdb_slugs, 25)
+                igdb.find_games(batch) for batch in itertools.batched(igdb_slugs, 25)
             )
         )
 
-        quoted_steam_appids = [
-            f'"{parts[2]}"'
+        steam_appids = [
+            parts[2]
             for hostname, paths_list in url_path_parts.items()
             if hostname and hostname.rsplit(".", 2)[-2:] == ["steampowered", "com"]
             for parts in paths_list
         ]
 
-        # 25 games per request, to avoid HTTP error 504 - gateway timeout
         external_games = itertools.chain.from_iterable(
-            query_igdb_external_games(
-                igdb,
-                f"fields {','.join(f'game.{fld}' for fld in igdb_notion.Game.get_query_fields())};"
-                f"where uid=({','.join(batch)}) & external_game_source=1;"
-                "limit 500;",
-            )
-            for batch in itertools.batched(quoted_steam_appids, 25)
+            igdb.find_steam_games(batch) for batch in itertools.batched(steam_appids, 25)
         )
 
         games += [external.game for external in external_games if external.game]
@@ -268,29 +217,20 @@ if __name__ == "__main__":
                     root_page, schema=page_type.schema, title=title
                 )
 
-        steam_spy = steamspy_notion.SteamSpySession()
-        atexit.register(steam_spy.close)
-
         # UNCOMMENT NEXT LINE TO UPDATE EXISTING PAGES
         # notion.NotionPageType.update = True
 
         for game in games:
-            steam_id = next(
-                (
-                    int(eg.uid)
-                    for eg in game.external_games
-                    if eg.external_game_source and eg.external_game_source.id == 1
-                ),
-                None,
-            )
-
-            steamspy_match = steam_spy.get_steam_spy_data(steam_id) if steam_id else None
+            steam_id = igdb_notion.get_steam_app_id(game)
+            release = game.first_release_date
 
             game_page = custom_notion.CustomGamePage.retrieve_or_create_from_data(
                 custom_notion.CustomGame(
                     game,
-                    hltb_notion.HLTBNotionPage.get_best_match(game.name),
-                    steamspy_match,
+                    hltb_notion.HLTBNotionPage.get_best_match(
+                        game.name, release.year if release else None
+                    ),
+                    spy.get_steam_spy_data(steam_id) if steam_id else None,
                 )
             )
             logger.info("%s (%s)", game.name, game_page.id)

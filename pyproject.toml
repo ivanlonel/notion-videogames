@@ -19,7 +19,6 @@ dependencies = [
   "betterproto2~=0.10",
   "howlongtobeatpy~=1.0",
   "httpx",                   # Let notion-client dictate httpx's version
-  "igdb-api-v4~=0.3.3",
   "notion-client",           # Let ultimate-notion dictate notion-client's version
   "pydantic~=2.14.2",
   "python-dotenv~=1.2",
@@ -101,6 +100,7 @@ lint.ignore = [
 lint.per-file-ignores."tests/*" = [
   "PLR2004", # Magic value used in comparison
   "S101",    # Use of assert
+  "S105",    # Possible hardcoded password (fake credentials)
 ]
 lint.flake8-annotations.allow-star-arg-any = true
 lint.mccabe.max-complexity = 15  # default 10  # C901
@@ -161,7 +161,6 @@ warn_unused_configs = true
 overrides = [
   { module = [
     "howlongtobeatpy.*",
-    "igdb.*",
   ], ignore_missing_imports = true },
   { module = [
     "notion_videogames.proto.*",

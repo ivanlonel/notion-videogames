@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
+import requests
 import ultimate_notion as uno
 from notion_client.errors import APIResponseError, HTTPResponseError, RequestTimeoutError
 from ultimate_notion.obj_api.core import Unset
@@ -477,3 +478,199 @@ def test_hand_written_properties_are_writable_schema_props(
     }
 
     assert set(page_type.get_populated_properties_dict(data)) <= writable
+
+
+def _fake_response(
+    *, json_data: object = None, content: bytes = b"", error: Exception | None = None
+) -> MagicMock:
+    response = MagicMock(spec=requests.Response, content=content)
+    response.json.return_value = json_data
+    response.raise_for_status.side_effect = error
+    return response
+
+
+@pytest.fixture(name="igdb_posts")
+def fixture_igdb_posts(monkeypatch: pytest.MonkeyPatch) -> list[SimpleNamespace]:
+    """Record the POSTs an IGDBSession makes, answering the token request and then `responses`."""
+    posts: list[SimpleNamespace] = []
+
+    def post(_: object, url: str, **kwargs: Any) -> MagicMock:
+        posts.append(SimpleNamespace(url=url, **kwargs))
+        return _fake_response(json_data={"access_token": "token"}, content=b"")
+
+    monkeypatch.setattr(igdb_notion.IGDBSession, "post", post)
+    return posts
+
+
+def test_igdb_token_request_keeps_the_secret_out_of_the_url(
+    igdb_posts: list[SimpleNamespace],
+) -> None:
+    session = igdb_notion.IGDBSession("client", "secret")
+
+    assert "secret" not in igdb_posts[0].url
+    assert igdb_posts[0].data["client_secret"] == "secret"
+    assert igdb_posts[0].timeout
+    assert session.headers["Authorization"] == "Bearer token"
+    assert session.headers["Client-ID"] == "client"
+
+
+def test_igdb_rejected_credentials_raise(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        igdb_notion.IGDBSession,
+        "post",
+        lambda *_, **__: _fake_response(error=requests.HTTPError("403")),
+    )
+
+    with pytest.raises(requests.HTTPError):
+        igdb_notion.IGDBSession("client", "wrong")
+
+
+def test_igdb_game_query(igdb_posts: list[SimpleNamespace]) -> None:
+    session = igdb_notion.IGDBSession("client", "secret")
+
+    assert session.find_games(["hades", "portal-2"]) == []
+
+    assert igdb_posts[-1].url.endswith("/games.pb")
+    assert igdb_posts[-1].timeout
+    assert 'where slug=("hades","portal-2");' in igdb_posts[-1].data
+    assert igdb_posts[-1].data.startswith("fields *,")
+
+
+def test_igdb_steam_query(igdb_posts: list[SimpleNamespace]) -> None:
+    session = igdb_notion.IGDBSession("client", "secret")
+
+    assert session.find_steam_games(["620"]) == []
+
+    assert igdb_posts[-1].url.endswith("/external_games.pb")
+    assert 'where uid=("620") & external_game_source=1;' in igdb_posts[-1].data
+    assert igdb_posts[-1].data.startswith("fields uid,game.*,")
+
+
+def test_igdb_answer_is_parsed(monkeypatch: pytest.MonkeyPatch) -> None:
+    answer = bytes(proto.GameResult(games=[proto.Game(id=1, name="Hades")]))
+    monkeypatch.setattr(
+        igdb_notion.IGDBSession,
+        "post",
+        lambda *_, **__: _fake_response(json_data={"access_token": "token"}, content=answer),
+    )
+
+    games = igdb_notion.IGDBSession("client", "secret").find_games(["hades"])
+
+    assert [game.name for game in games] == ["Hades"]
+
+
+def _external_game(source_id: int, uid: str) -> proto.ExternalGame:
+    source = proto.ExternalGameSource(id=source_id)
+    return proto.ExternalGame(id=uuid.uuid4().int % 1000, uid=uid, external_game_source=source)
+
+
+@pytest.mark.parametrize(
+    ("external_games", "expected"),
+    [
+        ([], None),
+        ([_external_game(5, "abc")], None),
+        ([_external_game(5, "abc"), _external_game(1, "620")], 620),
+        ([_external_game(1, "not-a-number")], None),
+    ],
+)
+def test_steam_app_id(external_games: list[proto.ExternalGame], expected: int | None) -> None:
+    game = proto.Game(id=1, external_games=external_games)
+
+    assert igdb_notion.get_steam_app_id(game) == expected
+
+
+def test_steam_spy_known_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = steamspy_notion.SteamSpySession()
+    monkeypatch.setattr(
+        session, "get", lambda *_, **__: _fake_response(json_data=STEAMSPY_KNOWN_APP)
+    )
+
+    game = session.get_steam_spy_data(620)
+
+    assert game is not None
+    assert game.name == "Portal 2"
+    assert game.price == 999
+    assert game.score_rank is None
+    assert game.languages == ("English", "French")
+    assert game.genres == ("Action", "Adventure")
+    assert game.tags == ("Platformer", "Puzzle")
+
+
+def test_steam_spy_unknown_app_is_no_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = steamspy_notion.SteamSpySession()
+    monkeypatch.setattr(
+        session, "get", lambda *_, **__: _fake_response(json_data=STEAMSPY_UNKNOWN_APP)
+    )
+
+    assert session.get_steam_spy_data(1) is None
+
+
+def test_steam_spy_requests_have_a_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = steamspy_notion.SteamSpySession()
+    get = MagicMock(return_value=_fake_response(json_data=STEAMSPY_UNKNOWN_APP))
+    monkeypatch.setattr(session, "get", get)
+
+    session.get_steam_spy_data(1)
+
+    assert get.call_args.kwargs["timeout"]
+
+
+def test_steam_spy_failed_request_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = steamspy_notion.SteamSpySession()
+    monkeypatch.setattr(
+        session, "get", lambda *_, **__: _fake_response(error=requests.HTTPError("500"))
+    )
+
+    with pytest.raises(requests.HTTPError):
+        session.get_steam_spy_data(620)
+
+
+def _hltb_entry(game_id: int, similarity: float, year: int) -> SimpleNamespace:
+    return SimpleNamespace(
+        similarity=similarity,
+        release_world=year,
+        json_content=HLTB_ENTRY | {"game_id": game_id, "release_world": year},
+    )
+
+
+def _use_hltb_results(monkeypatch: pytest.MonkeyPatch, results: object) -> None:
+    wrapper = SimpleNamespace(search=lambda *_, **__: results)
+    monkeypatch.setattr(hltb_notion, "_get_wrapper", lambda: wrapper)
+
+
+def test_hltb_most_similar_game_wins_over_a_closer_year(monkeypatch: pytest.MonkeyPatch) -> None:
+    _use_hltb_results(monkeypatch, [_hltb_entry(1, 0.7, 2016), _hltb_entry(2, 0.9, 1993)])
+
+    match = hltb_notion.HLTBNotionPage.get_best_match("Doom", 2016)
+
+    assert match is not None
+    assert match.game_id == 2
+    assert match.similarity == 0.9
+
+
+@pytest.mark.parametrize(
+    ("release_year", "expected_id"),
+    [(1993, 1), (2016, 2), (2017, 2), (None, 1)],
+)
+def test_hltb_ties_go_to_the_nearest_release_year(
+    monkeypatch: pytest.MonkeyPatch, release_year: int | None, expected_id: int
+) -> None:
+    _use_hltb_results(monkeypatch, [_hltb_entry(1, 1.0, 1993), _hltb_entry(2, 1.0, 2016)])
+
+    match = hltb_notion.HLTBNotionPage.get_best_match("Doom", release_year)
+
+    assert match is not None
+    assert match.game_id == expected_id
+
+
+def test_hltb_no_results_is_no_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    _use_hltb_results(monkeypatch, [])
+
+    assert hltb_notion.HLTBNotionPage.get_best_match("Unknown Game") is None
+
+
+def test_hltb_failed_search_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    _use_hltb_results(monkeypatch, None)
+
+    with pytest.raises(LookupError):
+        hltb_notion.HLTBNotionPage.get_best_match("Any Game")

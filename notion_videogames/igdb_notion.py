@@ -7,7 +7,10 @@ import operator
 import urllib.parse
 from typing import TYPE_CHECKING, Any, ClassVar, Final, NamedTuple, Protocol, override
 
+import requests
+import requests.adapters
 import ultimate_notion as uno
+import urllib3
 from ultimate_notion import PropType, props
 from ultimate_notion.schema import URL, Date, Relation
 
@@ -15,6 +18,8 @@ from notion_videogames import notion
 from notion_videogames.proto import proto
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from ultimate_notion.schema import Property
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -23,6 +28,81 @@ logger: logging.Logger = logging.getLogger(__name__)
 MAX_RELATION_PAGES: Final[int] = 100
 
 LOGO_SIZE: Final[str] = "t_logo_med"
+
+STEAM_SOURCE_ID: Final[int] = 1
+"""The external game source id IGDB gives to Steam"""
+
+
+class IGDBSession(requests.Session):
+    """A session authenticated against the IGDB API with a Twitch app token."""
+
+    api_url: ClassVar[str] = "https://api.igdb.com/v4"
+    auth_url: ClassVar[str] = "https://id.twitch.tv/oauth2/token"
+    timeout: ClassVar[float] = 120
+    retry_policy: ClassVar[urllib3.util.retry.Retry] = urllib3.util.retry.Retry(
+        total=5,
+        backoff_factor=1.875,
+        status_forcelist={429, 500, 502, 503, 504},
+        allowed_methods=None,  # IGDB queries are POSTs, but they only read
+    )
+
+    def __init__(self, client_id: str, client_secret: str) -> None:
+        super().__init__()
+
+        self.mount("https://", requests.adapters.HTTPAdapter(max_retries=self.retry_policy))
+
+        response = self.post(
+            self.auth_url,
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "grant_type": "client_credentials",
+            },
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        self.headers.update(
+            {
+                "Client-ID": client_id,
+                "Authorization": f"Bearer {response.json()['access_token']}",
+            }
+        )
+
+    def _query(self, endpoint: str, query: str) -> bytes:
+        response = self.post(f"{self.api_url}/{endpoint}", data=query, timeout=self.timeout)
+        response.raise_for_status()
+        return response.content
+
+    def find_games(self, slugs: Iterable[str]) -> list[proto.Game]:
+        fields = ",".join(Game.get_query_fields())
+        quoted = ",".join(f'"{slug}"' for slug in slugs)
+        query = f"fields {fields};where slug=({quoted});limit 500;"
+        return proto.GameResult.FromString(self._query("games.pb", query)).games
+
+    def find_steam_games(self, app_ids: Iterable[str]) -> list[proto.ExternalGame]:
+        fields = ",".join(f"game.{field}" for field in Game.get_query_fields())
+        quoted = ",".join(f'"{app_id}"' for app_id in app_ids)
+        query = (
+            f"fields uid,{fields};"
+            f"where uid=({quoted}) & external_game_source={STEAM_SOURCE_ID};"
+            "limit 500;"
+        )
+        return proto.ExternalGameResult.FromString(
+            self._query("external_games.pb", query)
+        ).externalgames
+
+
+def get_steam_app_id(game: proto.Game) -> int | None:
+    return next(
+        (
+            int(external.uid)
+            for external in game.external_games
+            if external.external_game_source
+            and external.external_game_source.id == STEAM_SOURCE_ID
+            and external.uid.isdigit()
+        ),
+        None,
+    )
 
 
 def add_https_scheme(url: str) -> str:
