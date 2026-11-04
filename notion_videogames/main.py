@@ -264,7 +264,9 @@ if __name__ == "__main__":
                 data_sources[title] = notion_session.get_ds(data_sources[title].id)
                 rebind_db(data_sources[title], page_type.schema)
             else:
-                data_sources[title] = notion_session.create_ds(root_page, schema=page_type.schema)
+                data_sources[title] = notion_session.create_ds(
+                    root_page, schema=page_type.schema, title=title
+                )
 
         steam_spy = steamspy_notion.SteamSpySession()
         atexit.register(steam_spy.close)

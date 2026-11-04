@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 from typing import TYPE_CHECKING, Any, ClassVar, Self, cast, override
 
 import ultimate_notion as uno
@@ -134,8 +133,10 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame]):
     hltb_wrapper: ClassVar[HowLongToBeat] = HowLongToBeat(0)
 
     @override
-    @staticmethod
-    def get_populated_properties_dict(data: HowLongToBeatGame) -> dict[str, props.PropertyValue]:
+    @classmethod
+    def get_populated_properties_dict(
+        cls, data: HowLongToBeatGame
+    ) -> dict[str, props.PropertyValue]:
         return {
             "ID": props.Number(data.game_id),
             "Name": props.Title(data.game_name),
@@ -189,19 +190,8 @@ class HLTBNotionPage(notion.NotionPageType[HowLongToBeatGame]):
 
     @override
     @classmethod
-    @functools.lru_cache(maxsize=None, typed=True)  # Edit each page only once per run per data obj
-    def retrieve_or_create_from_data(
-        cls,
-        data: HowLongToBeatGame,
-        *,
-        icon_url: str | None = None,
-        cover_url: str | None = None,
-    ) -> uno.Page:
-        return super().retrieve_or_create_from_data(
-            data,
-            icon_url=icon_url or data.game_image_url,
-            cover_url=cover_url or data.game_image_url,
-        )
+    def get_image_urls(cls, data: HowLongToBeatGame) -> tuple[str | None, str | None]:
+        return data.game_image_url, data.game_image_url
 
     @classmethod
     def get_best_match(cls, name: str, *, ignore_case: bool = True) -> HowLongToBeatGame | None:

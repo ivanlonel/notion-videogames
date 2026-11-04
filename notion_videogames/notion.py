@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import functools
 import logging
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 import tenacity
 import ultimate_notion as uno
@@ -28,13 +28,24 @@ class NotionPageType[T](abc.ABC):
     update: ClassVar[bool] = False
     """Whether pages that already exist should be updated"""
 
-    @staticmethod
+    @override
+    def __init_subclass__(cls, *, schema: type[uno.Schema] | None = None, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        if schema is not None:
+            cls.schema = schema
+
+    @classmethod
     @abc.abstractmethod
-    def get_populated_properties_dict(data: T) -> dict[str, props.PropertyValue]: ...
+    def get_populated_properties_dict(cls, data: T) -> dict[str, props.PropertyValue]: ...
 
     @classmethod
     @abc.abstractmethod
     def retrieve_from_data(cls, data: T) -> uno.Page | None: ...
+
+    @classmethod
+    @abc.abstractmethod
+    def get_image_urls(cls, data: T) -> tuple[str | None, str | None]:
+        """Return the URLs of the page's icon and cover, if it has them."""
 
     @classmethod
     def validate_and_build_schema_model(cls, data: T) -> SchemaModel:
@@ -116,13 +127,8 @@ class NotionPageType[T](abc.ABC):
         reraise=True,
         before_sleep=tenacity.before_sleep.before_sleep_log(logger, logging.INFO, exc_info=True),
     )
-    def retrieve_or_create_from_data(
-        cls,
-        data: T,
-        *,
-        cover_url: str | None = None,
-        icon_url: str | None = None,
-    ) -> uno.Page:
+    def retrieve_or_create_from_data(cls, data: T) -> uno.Page:
+        icon_url, cover_url = cls.get_image_urls(data)
         cover = uno.url(cover_url) if cover_url else None
         icon = uno.url(icon_url) if icon_url else None
 
