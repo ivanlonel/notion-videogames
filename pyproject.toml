@@ -31,7 +31,6 @@ urls.Repository = "https://github.com/ivanlonel/notion-videogames"
 
 [dependency-groups]
 dev = [
-  "black~=26.10",
   "deptry~=0.25",
   "flake8~=7.5",
   "flake8-2020~=1.8",
@@ -57,11 +56,11 @@ dev = [
   "flake8-type-checking~=3.2",
   "flake8-use-fstring~=1.4",
   "flake8-useless-assert~=0.4",
-  "isort~=9.0",
   "mypy[faster-cache]~=2.4",
   "pep8-naming~=0.15",
   "prek~=0.5",
   "pylint~=4.1",
+  "pytest~=9.2",
   "ruff~=0.17",
   "tryceratops~=2.4",
   "ty~=0.0.95",
@@ -74,14 +73,9 @@ dev = [
 hooks = [
   "pre-commit-hooks~=6.0",
   "pyproject-fmt~=2.30",
-  "pyupgrade~=3.22",
   "sync-with-uv~=0.6",
   "uv~=0.13",
 ]
-
-[tool.black]
-line-length = 99
-force-exclude = "notion_videogames/proto"
 
 [tool.ruff]
 required-version = ">=0.9"
@@ -97,26 +91,18 @@ lint.ignore = [
   "D203",   # Use a blank line to separate the docstring from the class definition
   "D212",   # Multi-line docstring summary should start at the first line
   "E203",   # Whitespace before ',', ';', or ':'
-  # (Black enforces an equal amount of whitespace around slice operators)
+  # (ruff format enforces an equal amount of whitespace around slice operators)
   "E501",   # Line too long (pycodestyle)
   "E701",   # Multiple statements on one line (colon)
-  # (Black collapses classes/functions consisting of ... to a single line)
+  # (ruff format collapses classes/functions consisting of ... to a single line)
   "ERA001", # Found commented-out code
+]
+lint.per-file-ignores."tests/*" = [
+  "PLR2004", # Magic value used in comparison
+  "S101",    # Use of assert
 ]
 lint.flake8-annotations.allow-star-arg-any = true
 lint.mccabe.max-complexity = 15  # default 10  # C901
-
-[tool.isort]
-profile = "black"
-line_length = 99
-extend_skip_glob = [
-  "notion_videogames/proto/*",
-]
-skip_gitignore = true
-
-[tool.pycln]
-all = true
-extend_exclude = "notion_videogames/proto"
 
 [tool.pylint]
 messages_control.disable = [
