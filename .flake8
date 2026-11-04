@@ -33,16 +33,13 @@ extend-ignore =
     # Multi-line docstring summary should start at the first line
     D212
     # Whitespace before ‘,’, ‘;’, or ‘:’
-    # (Black enforces an equal amount of whitespace around slice operators)
+    # (ruff format enforces an equal amount of whitespace around slice operators)
     E203
     # Line too long (pycodestyle)
     E501
     # Multiple statements on one line (colon)
-    # (Black collapses classes/functions consisting of ... to a single line)
+    # (ruff format collapses classes/functions consisting of ... to a single line)
     E701
-per-file-ignores =
-    # Needed to use a ruff noqa comment with a code flake8 does not recognize
-    notion_videogames/igdb_notion.py: NQA102
 extend-exclude = notion_videogames/proto/*
 max-complexity = 15
 max-doc-length = 99

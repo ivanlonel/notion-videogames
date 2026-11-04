@@ -10,11 +10,11 @@ title := "Write-Host -ForegroundColor Cyan"
 _default:
     @just --list --unsorted
 
-[confirm('This will remove the virtual environment and other files ignored by git. Do you want to continue? [y/N])')]
-[doc('Clean environment artifacts (removes everything in .gitignore, including .venv)')]
+[confirm('This will remove the virtual environment and other files ignored by git, except .env. Do you want to continue? [y/N])')]
+[doc('Clean environment artifacts (removes everything in .gitignore except .env, including .venv)')]
 clean:
-    @{{ title }} "Removing all files and folders ignored by git..."
-    "n" | git clean -fdX
+    @{{ title }} "Removing all files and folders ignored by git, except .env..."
+    "n" | git clean -fdX -e '!.env'
 
 [doc('Run pre-commit hooks (examples: `just prek` or `just prek sync-with-uv`)')]
 [script]
@@ -78,16 +78,22 @@ format:
 lint:
     @{{ title }} "Running linting tools..."
     uv run ruff check
-    uv run flake8 notion_videogames
-    uv run pylint notion_videogames
+    uv run flake8 notion_videogames tests
+    uv run pylint notion_videogames tests
 
 [doc('Static type analysis')]
 [group('QA')]
 type-check:
     @{{ title }} "Running static type checking with mypy..."
     uv run ty check
-    uv run mypy notion_videogames
+    uv run mypy notion_videogames tests
+
+[doc('Run the offline test suite (no network or credentials needed)')]
+[group('QA')]
+test:
+    @{{ title }} "Running tests..."
+    uv run pytest
 
 [doc('Run all QA checks')]
 [group('QA')]
-qa: format lint type-check
+qa: format lint type-check test

@@ -75,30 +75,6 @@ repos:
     hooks:
       - id: pyproject-fmt
 
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.22.0
-    hooks:
-      - id: pyupgrade
-        args:
-          - --py312-plus
-        exclude: ^notion_videogames/proto/
-        # pyupgrade's tokenizer, pinned so it changes only with uv.lock.
-        additional_dependencies:
-          - tokenize-rt==6.2.0  # sync-with-uv
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 9.0.2
-    hooks:
-      - id: isort
-
-  - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 26.10.1
-    hooks:
-      - id: black
-        # black's tokenizer, pinned so it changes only with uv.lock.
-        additional_dependencies:
-          - pytokens==0.4.1  # sync-with-uv
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.3
     hooks:
@@ -185,6 +161,7 @@ repos:
         entry: uv run --exact mypy
         args:
           - notion_videogames
+          - tests
           - --show-traceback
         language: system
         pass_filenames: false
@@ -202,3 +179,13 @@ repos:
         pass_filenames: false
         require_serial: true
         always_run: true
+
+      - id: pytest
+        name: pytest
+        entry: uv run --exact pytest
+        language: system
+        pass_filenames: false
+        require_serial: true
+        types_or:
+          - python
+          - pyi

@@ -14,8 +14,6 @@
   "flake8.importStrategy": "fromEnvironment",
   "mypy-type-checker.importStrategy": "fromEnvironment",
   "pylint.importStrategy": "fromEnvironment",
-  "black-formatter.importStrategy": "fromEnvironment",
-  "isort.importStrategy": "fromEnvironment",
   "[python]": {
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
