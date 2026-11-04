@@ -11,16 +11,19 @@ Populates a videogame library in Notion. Reads a source Notion database for URLs
 Dependencies are managed with `uv` (lockfile-driven); tasks are exposed through `just` (PowerShell-backed `justfile`). Run `just` with no recipe to list everything.
 
 - `just sync` — install dev deps from `uv.lock` (`uv sync --frozen`)
-- `just run` — `uv run -m notion_videogames.main`
-- `just lock` — `uv lock --upgrade` (and `just uv-export` to refresh `requirements.txt`)
-- `just qa` — runs `format` → `lint` → `type-check` in sequence
+- `just run [flags]` — `uv run notion-videogames`, with `--dry-run`, `--limit N`, `--update`, `-v`
+- `just lock` — `uv lock --upgrade` (and `just uv-export` to refresh `requirements.txt`). To change a dependency without upgrading everything else, use plain `uv lock`.
+- `just qa` — runs `format` → `lint` → `type-check` → `test` in sequence
   - `just format` — `ty check --fix`, `ruff check --fix`, `ruff format`
-  - `just lint` — `ruff check`, `flake8 notion_videogames`, `pylint notion_videogames`
-  - `just type-check` — `ty check`, `mypy notion_videogames`
+  - `just lint` — `ruff check`, `flake8 notion_videogames tests`, `pylint notion_videogames tests`
+  - `just type-check` — `ty check`, `mypy notion_videogames tests`
+  - `just test` — `pytest`
 - `just prek [hook]` — run all pre-commit hooks, or a single one (use a hook id like `uv-lock-upgrade` to invoke a manual-stage hook)
 - `just proto` — re-download `igdbapi.proto` and regenerate `notion_videogames/proto/` with `betterproto2` (run this if IGDB updates their schema)
 
-There is no test suite in this repo. Don't invent one; if a change calls for verification, run `just qa` and (with credentials present) `just run`.
+Tests live in one file, `tests/test_offline.py`, and use no network, credentials or Notion. Keep it that way, and add to that file rather than building up a larger suite. Real verification against Notion is `uv run notion-videogames --dry-run` (read-only), then `--limit N`. `--update` edits existing pages, so ask before running it against the user's library.
+
+On Windows, VS Code language servers running from `.venv` can lock compiled modules, which makes `uv sync` fail with "Acesso negado"/"Access denied" when removing or upgrading one. Reloading the VS Code window releases them.
 
 ## Dependency updates
 
@@ -34,44 +37,50 @@ Renovate (`.github/renovate.json`) works together with the **Post-Renovate Hooks
 
 ## Required environment
 
-`main.py` calls `load_dotenv()` and reads these from `.env` or the shell:
+`main()` calls `load_dotenv()` and reads these from `.env` or the shell (`.env.example` lists them). `Settings.from_env` names everything missing at once:
 
 - `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` — Twitch app credentials used to mint an IGDB OAuth token
+- `NOTION_TOKEN` — read by `ultimate_notion` itself, which also accepts a token in its own config file
 - `SOURCE_DB_ID` — Notion database id whose pages have a `URL` property pointing to igdb.com or store.steampowered.com
 - `MAIN_PAGE_ID` — Notion page under which all generated databases live (created if missing, otherwise rebound)
 - `MAIN_GAMES_DB_NAME` — title of the top-level "Custom Game" database (required, no default)
-- Notion auth itself flows through `ultimate_notion`'s `Session.get_or_create()` (see its docs for the env var it expects)
 
 ## Architecture
 
 ### Data flow (`notion_videogames/main.py`)
 
-1. Pull all pages from `SOURCE_DB_ID`; parse their `URL` props into `(hostname, path-parts)` tuples.
-2. From igdb.com URLs, extract slugs and query the IGDB protobuf endpoint in batches of 25 for `games.pb`.
-3. From store.steampowered.com URLs, extract Steam app IDs and query `external_games.pb` with `external_game_source=1` (Steam), pulling the linked IGDB game in the same response.
-4. For every database title in `notion_db_types`, either create it under `MAIN_PAGE_ID` or rebind the existing one via `rebind_db` (which merges existing Select/MultiSelect options into the schema before binding, since `ultimate_notion` does not do this automatically).
-5. For each game, retrieve HowLongToBeat best-match and (if a Steam id is present) SteamSpy data, then upsert one `CustomGamePage` per game.
+1. Pull all pages from `SOURCE_DB_ID`; `parse_source_urls` sorts their `URL` props into IGDB slugs, Steam app ids, and unrecognized URLs, which get reported.
+2. For every database title in `DB_PAGE_TYPES` plus the main one, either create it under `MAIN_PAGE_ID` or rebind the existing one via `rebind_db`. That merges existing Select/MultiSelect options into the schema, since `ultimate_notion` doesn't, and tolerates columns added by hand in Notion. The dict's order matters: a database must come after the ones its relations point to.
+3. `custom_notion.find_imported` reads the library once, so that only what's missing gets fetched. `--update` skips this and goes through everything.
+4. Query IGDB's protobuf endpoints in batches of 25: `games.pb` by slug, and `external_games.pb` with `external_game_source=1` (Steam) by app id, pulling the linked IGDB game in the same response.
+5. For each game, retrieve the HowLongToBeat best match and (if a Steam id is present) SteamSpy data, then upsert one `CustomGamePage`.
 
-To update already-existing pages, uncomment `notion.NotionPageType.update = True` near the end of `main.py`. Default behavior is create-only.
+A failed game or IGDB batch is logged and reported at the end, and the exit status is 1. A failed HLTB or SteamSpy lookup still creates the game, without that link. Rejected requests (4xx) and schema mismatches end the run with a one-line message (`-v` for the traceback).
+
+A no-op rerun still costs about two GETs per database: `root_page.sub_dss` resolves each one, and that's inside `ultimate_notion`.
 
 ### Module layout
 
-- `notion.py` — abstract base `NotionPageType[T]`. Owns the `retrieve_or_create_from_data` flow: schema validation via `to_pydantic_model`, `tenacity` retry on `HTTPResponseError`/`RequestTimeoutError`, and an `lru_cache` so each data object hits the API once per run.
-- `igdb_notion.py` — one `NotionPageType` subclass per IGDB protobuf message (Game, Platform, Cover, etc.). Subclasses follow IGDB's relation graph; `get_query_fields` controls what fields are pulled. Monkey-patches `betterproto2.Message.__hash__` so messages are usable as `lru_cache` keys.
-- `hltb_notion.py` — `HowLongToBeatGame` dataclass + `HLTBNotionPage`; performs best-match lookup against the HLTB API by game name.
-- `steamspy_notion.py` — `SteamSpyGame` dataclass + `SteamSpyNotionPage` + `SteamSpySession` (a `requests.Session` with retry adapter; closed via `atexit`).
-- `custom_notion.py` — the user-facing "Custom Game" schema. Aggregates IGDB/HLTB/SteamSpy relations with rollup properties (playtime, ratings, etc.) and adds personal-tracking props (Owned, Notes, "VAMOS JOGAR").
-- `proto/` — generated `betterproto2` output for `igdbapi.proto`. Excluded from black, ruff, isort, pylint, deptry, and mypy (the relevant tools all have explicit excludes in `pyproject.toml`). Never hand-edit; regenerate with `just proto`.
+- `notion.py` — abstract base `NotionPageType[T]`, which owns the `retrieve_or_create_from_data` flow. Its `_pages` map (keyed by page type and source id) makes each page get looked up and written once per run. `retry_transient` covers 409, 429, 5xx, timeouts and transport errors, and wraps single API calls only: related pages get resolved between those calls, because a retry around that recursion would multiply attempts at every nesting level. `--update` sets the `update` class variable.
+- `igdb_notion.py` — `IGDBSession`, plus a schema and a `NotionPageType` subclass per IGDB protobuf message (Game, Platform, Cover, etc.). `IGDBNotionPage` builds properties and query fields from the schema alone; subclasses declare only an `image` rule or a `computed` value.
+- `hltb_notion.py` — `HowLongToBeatGame` dataclass + `HLTBNotionPage`; performs best-match lookup against the HLTB API by game name, requiring `MIN_SIMILARITY` and breaking ties by release year.
+- `steamspy_notion.py` — `SteamSpyGame` dataclass + `SteamSpyNotionPage` + `SteamSpySession` (a `requests.Session` with retry adapter).
+- `custom_notion.py` — the user-facing "Custom Game" schema. Aggregates IGDB/HLTB/SteamSpy relations with rollup properties (playtime, ratings, etc.) and adds personal-tracking props (Owned, Notes, "VAMOS JOGAR"). Also has `find_imported`.
+- `proto/` — generated `betterproto2` output for `igdbapi.proto`. Excluded from ruff, flake8, pylint, deptry, and mypy (the relevant tools all have explicit excludes). Never hand-edit; regenerate with `just proto`.
 
 ### Notion model conventions
 
-- Each `NotionPageType.schema` (a `uno.Schema` subclass) defines a Notion database. Relations between schemas mirror the IGDB graph; rollups in `CustomGamePageSchema` surface fields across those relations.
-- Pages are looked up by their source-system id (IGDB id, HLTB game_id, Steam appid) via `retrieve_from_data` — usually a `query.filter(uno.prop("ID") == data.id)` on the bound database.
-- `validate_and_build_schema_model` reuses `ultimate_notion`'s pydantic schema model to validate properties before calling `pages.create`/`pages.update`. Read-only props are stripped via `get_ro_props()`.
+- Each `NotionPageType.schema` (a `uno.Schema` subclass, passed as `schema=` in the class statement) defines a Notion database. Relations between schemas mirror the IGDB graph; rollups in `CustomGamePageSchema` surface fields across those relations.
+- Changing a schema's Notion-facing names breaks binding to existing databases. Python attribute names can change freely, but in IGDB schemas they must match the message's fields.
+- In IGDB schemas, a property reads the message field named like its attribute; a relation's target comes from `schema=`. `related_to_*` relations are the far side of two-way relations and are neither written nor queried, and neither are self-references. Anything else goes in `computed`. Adding a property is one line, and `test_every_schema_prop_maps_to_a_message_field` catches a wrong name, since type checkers can't see through the generic mapping.
+- 22 IGDB entity types are dormant: their classes exist and their `DB_PAGE_TYPES` entries are commented out. Enabling one means uncommenting its entry (mind the order) and, for it to be reachable from a game, adding the relation to `GameSchema`.
+- Pages are looked up by their source-system id (IGDB id, HLTB game_id, Steam appid) via `get_lookup_condition`, usually `uno.prop("ID") == cls.get_id(data)` on the bound database.
+- `prop.prop_value` and `prop.readonly` raise on an unbound `Relation`, so use `props.Relations` directly and don't reach for those in offline code.
 
 ## Code style notes (in addition to what the tooling enforces)
 
 - Python 3.12+; `from __future__ import annotations` at the top of each module is the established pattern.
 - Linting is maximal: `ruff lint.select = ["ALL"]` with a curated ignore list, plus the full flake8-plugin stack, plus pylint, plus mypy strict-ish (`disallow_untyped_defs`, `warn_return_any`, etc.), plus `ty`. Run `just format` before committing — most rules autofix.
-- Line length is 99 across black, ruff, isort, and flake8.
+- `# noqa` for a ruff-only code trips flake8-noqa, so scope those with `per-file-ignores` in `pyproject.toml` instead.
+- Line length is 99 (`ruff format`, and flake8's `max-line-length` of 90 plus bugbear's 10% B950 margin).
 - `notion_videogames/proto/` is off-limits to formatters/linters; the excludes are already wired in.

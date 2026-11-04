@@ -1,8 +1,14 @@
+[build-system]
+build-backend = "uv_build"
+requires = [ "uv-build>=0.13,<0.14" ]
+
 [project]
 name = "notion-videogames"
 version = "0.1"
+description = "Create a videogames library on Notion, importing data from IGDB, SteamSpy and How Long to Beat"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = [ "LICENSE" ]
 authors = [
   { name = "Ivan Donisete Lonel", email = "ivanlonel91@gmail.com" },
 ]
@@ -28,6 +34,7 @@ dependencies = [
   "urllib3",                 # Let requests dictate urllib3's version
 ]
 urls.Repository = "https://github.com/ivanlonel/notion-videogames"
+scripts.notion-videogames = "notion_videogames.main:main"
 
 [dependency-groups]
 dev = [
@@ -76,6 +83,9 @@ hooks = [
   "sync-with-uv~=0.6",
   "uv~=0.13",
 ]
+
+[tool.uv]
+build-backend.module-root = ""
 
 [tool.ruff]
 required-version = ">=0.9"

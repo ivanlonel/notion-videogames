@@ -27,6 +27,7 @@ repos:
         args:
           - --frozen
           - --no-dev
+          - --no-emit-project
           - --output-file=requirements.txt
       - id: uv-sync
         always_run: true
