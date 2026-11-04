@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 import ultimate_notion as uno
 from ultimate_notion import PropType, props
@@ -193,3 +193,35 @@ class CustomGamePage(notion.NotionPageType[CustomGame], schema=CustomGamePageSch
     @classmethod
     def get_image_urls(cls, data: CustomGame) -> tuple[str | None, str | None]:
         return igdb_notion.Game.get_image_urls(data.igdb)
+
+
+@dataclass(frozen=True)
+class Imported:
+    """What the library already holds, so that a run can skip fetching it again."""
+
+    igdb_ids: frozenset[int] = frozenset()
+    slugs: frozenset[str] = frozenset()
+    steam_app_ids: frozenset[str] = frozenset()
+
+
+def _read_all_pages(page_type: type[notion.NotionPageType[Any]]) -> list[uno.Page]:
+    return list(notion.retry_transient(page_type.schema.get_ds().get_all_pages)())
+
+
+def find_imported() -> Imported:
+    # Reading these two first fills the session's page cache, which is where following relations
+    # gets its pages from. Each relation followed below would be an API call otherwise.
+    _read_all_pages(igdb_notion.Game)
+    _read_all_pages(steamspy_notion.SteamSpyNotionPage)
+
+    igdb_ids: set[int] = set()
+    slugs: set[str] = set()
+    steam_app_ids: set[str] = set()
+    for page in _read_all_pages(CustomGamePage):
+        for igdb_page in page.props["IGDB"]:
+            igdb_ids.add(int(igdb_page.props["ID"] or 0))
+            slugs.add(str(igdb_page.props["Slug"]))
+        for steam_page in page.props["Steam Spy"]:
+            steam_app_ids.add(str(int(steam_page.props["ID"] or 0)))
+
+    return Imported(frozenset(igdb_ids), frozenset(slugs), frozenset(steam_app_ids))
