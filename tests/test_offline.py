@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import logging
 import types
 import typing
@@ -16,10 +17,19 @@ import pytest
 import requests
 import ultimate_notion as uno
 from notion_client.errors import APIResponseError, HTTPResponseError, RequestTimeoutError
+from ultimate_notion import PropType
+from ultimate_notion.errors import SchemaError
 from ultimate_notion.obj_api.core import Unset
-from ultimate_notion.schema import Formula, Rollup
+from ultimate_notion.schema import Formula, Relation, Rollup
 
-from notion_videogames import custom_notion, hltb_notion, igdb_notion, notion, steamspy_notion
+from notion_videogames import (
+    custom_notion,
+    hltb_notion,
+    igdb_notion,
+    main,
+    notion,
+    steamspy_notion,
+)
 from notion_videogames.proto import proto
 
 if TYPE_CHECKING:
@@ -674,3 +684,301 @@ def test_hltb_failed_search_raises(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(LookupError):
         hltb_notion.HLTBNotionPage.get_best_match("Any Game")
+
+
+def test_every_relation_targets_an_earlier_database() -> None:
+    created: set[object] = set()
+    page_types: list[type[notion.NotionPageType[Any]]] = [
+        *main.DB_PAGE_TYPES.values(),
+        custom_notion.CustomGamePage,
+    ]
+    for page_type in page_types:
+        for prop in page_type.schema.get_props():
+            if isinstance(prop, Relation) and not igdb_notion.is_unmapped(prop):
+                assert prop.schema in created, f"{page_type.__name__}.{prop.attr_name}"
+        created.add(page_type.schema)
+
+
+@pytest.mark.parametrize(
+    ("url", "slugs", "steam_app_ids"),
+    [
+        ("https://www.igdb.com/games/hades", ["hades"], []),
+        ("https://igdb.com/games/hades/", ["hades"], []),
+        ("https://www.igdb.com/games/hades/presskit?x=1", ["hades"], []),
+        ("https://www.igdb.com/games/hades%202", ["hades 2"], []),
+        ("https://store.steampowered.com/app/620", [], ["620"]),
+        ("https://store.steampowered.com/app/620/Portal_2/", [], ["620"]),
+        ("https://store.steampowered.com/agecheck/app/620/", [], ["620"]),
+    ],
+)
+def test_source_urls_recognized(url: str, slugs: list[str], steam_app_ids: list[str]) -> None:
+    assert main.parse_source_urls([url]) == main.SourceUrls(slugs, steam_app_ids, [])
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.igdb.com/games",
+        "https://www.igdb.com/games/",
+        "https://www.igdb.com/companies/valve",
+        'https://www.igdb.com/games/a"b',
+        "https://www.igdb.com/games/a%22b",
+        "https://www.igdb.com/games/a%5Cb",
+        "https://notigdb.com/games/hades",
+        "https://store.steampowered.com/app/",
+        "https://store.steampowered.com/app/portal",
+        "https://store.steampowered.com/app/620x",
+        "https://store.steampowered.com/sub/620",
+        "https://steamcommunity.com/app/620",
+        "not a url",
+        "http://[bad",
+    ],
+)
+def test_source_urls_unrecognized(url: str) -> None:
+    assert main.parse_source_urls([url]) == main.SourceUrls([], [], [url])
+
+
+def test_source_urls_drop_repeats() -> None:
+    url = "https://www.igdb.com/games/hades"
+
+    assert main.parse_source_urls([url, url]).slugs == ["hades"]
+
+
+def _set_env(monkeypatch: pytest.MonkeyPatch, *, token: str | None, **env: str) -> None:
+    for field in dataclasses.fields(main.Settings):
+        monkeypatch.delenv(field.name.upper(), raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    config = SimpleNamespace(ultimate_notion=SimpleNamespace(token=token))
+    monkeypatch.setattr(main, "get_or_create_cfg", lambda: config)
+
+
+def test_settings_name_everything_missing_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_env(monkeypatch, token=None, SOURCE_DB_ID="source")
+
+    with pytest.raises(SystemExit) as error:
+        main.Settings.from_env()
+
+    for name in ("IGDB_CLIENT_ID", "IGDB_CLIENT_SECRET", "MAIN_PAGE_ID", "NOTION_TOKEN"):
+        assert name in str(error.value)
+    assert "SOURCE_DB_ID" not in str(error.value)
+
+
+def test_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_env(
+        monkeypatch,
+        token="token",
+        IGDB_CLIENT_ID="id",
+        IGDB_CLIENT_SECRET="secret",
+        SOURCE_DB_ID="source",
+        MAIN_PAGE_ID="page",
+        MAIN_GAMES_DB_NAME="Games",
+    )
+
+    assert main.Settings.from_env() == main.Settings("id", "secret", "source", "page", "Games")
+
+
+@pytest.mark.parametrize("argument", ["0", "-1", "many"])
+def test_limit_must_be_a_positive_number(argument: str) -> None:
+    with pytest.raises(SystemExit):
+        main.parse_args(["--limit", argument])
+
+
+def _declared_columns() -> type[uno.Schema]:
+    class Declared(uno.Schema):
+        name = PropType.Title("Name")
+        notes = PropType.Text("Notes")
+
+    return Declared
+
+
+def test_columns_added_in_notion_are_tolerated() -> None:
+    declared = _declared_columns()
+
+    class Reflected(uno.Schema):
+        name = PropType.Title("Name")
+        notes = PropType.Text("Notes")
+        mine = PropType.Checkbox("My Column")
+
+    assert main.drop_undeclared_columns(Reflected, declared) == ["My Column"]
+    Reflected.assert_consistency_with(declared)
+    assert len(declared.get_props()) == 2
+
+
+def test_columns_missing_from_notion_are_still_an_error() -> None:
+    declared = _declared_columns()
+
+    class Reflected(uno.Schema):
+        name = PropType.Title("Name")
+
+    assert main.drop_undeclared_columns(Reflected, declared) == []
+    with pytest.raises(SchemaError):
+        Reflected.assert_consistency_with(declared)
+
+
+def test_columns_changed_in_notion_are_still_an_error() -> None:
+    declared = _declared_columns()
+
+    class Reflected(uno.Schema):
+        name = PropType.Title("Name")
+        notes = PropType.Checkbox("Notes")
+
+    assert main.drop_undeclared_columns(Reflected, declared) == []
+    with pytest.raises(SchemaError):
+        Reflected.assert_consistency_with(declared)
+
+
+class FakeIGDB:
+    """An IGDBSession answering from fixed data, and failing for the values in `failing`."""
+
+    def __init__(self, *games: proto.Game, failing: tuple[str, ...] = ()) -> None:
+        self.games = games
+        self.failing = failing
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        pass
+
+    def _check(self, values: tuple[str, ...]) -> None:
+        if set(values) & set(self.failing):
+            raise requests.exceptions.RetryError
+
+    def find_games(self, slugs: tuple[str, ...]) -> list[proto.Game]:
+        self._check(slugs)
+        return [game for game in self.games if game.slug in slugs]
+
+    def find_steam_games(self, app_ids: tuple[str, ...]) -> list[proto.ExternalGame]:
+        self._check(app_ids)
+        return [
+            proto.ExternalGame(id=game.id, uid=external.uid, game=game)
+            for game in self.games
+            for external in game.external_games
+            if external.uid in app_ids
+        ]
+
+
+SETTINGS = main.Settings("id", "secret", "source", "page", "Games")
+
+
+def test_fetch_games_merges_urls_of_the_same_game(monkeypatch: pytest.MonkeyPatch) -> None:
+    hades = proto.Game(id=1, slug="hades", external_games=[_external_game(1, "1145360")])
+    monkeypatch.setattr(igdb_notion, "IGDBSession", lambda *_: FakeIGDB(hades))
+    summary = main.Summary()
+
+    games = main.fetch_games(SETTINGS, ["hades"], ["1145360"], summary)
+
+    assert [game.id for game in games] == [1]
+    assert not summary.not_on_igdb
+
+
+def test_fetch_games_reports_what_igdb_does_not_have(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(igdb_notion, "IGDBSession", lambda *_: FakeIGDB())
+    summary = main.Summary()
+
+    assert not main.fetch_games(SETTINGS, ["unknown"], ["999"], summary)
+    assert summary.not_on_igdb == ["unknown", "999"]
+    assert not summary.failed
+
+
+def test_fetch_games_survives_a_failed_batch(monkeypatch: pytest.MonkeyPatch) -> None:
+    hades = proto.Game(id=1, slug="hades")
+    monkeypatch.setattr(main, "IGDB_BATCH_SIZE", 1)
+    monkeypatch.setattr(igdb_notion, "IGDBSession", lambda *_: FakeIGDB(hades, failing=("bad",)))
+    summary = main.Summary()
+
+    games = main.fetch_games(SETTINGS, ["bad", "hades"], [], summary)
+
+    assert [game.id for game in games] == [1]
+    assert summary.failed == ["bad"]
+    assert not summary.not_on_igdb
+
+
+def test_fetch_games_stops_when_igdb_rejects_the_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    igdb = MagicMock(spec=igdb_notion.IGDBSession)
+    igdb.__enter__.return_value = igdb
+    igdb.find_games.side_effect = requests.HTTPError("401")
+    monkeypatch.setattr(igdb_notion, "IGDBSession", lambda *_: igdb)
+
+    with pytest.raises(requests.HTTPError):
+        main.fetch_games(SETTINGS, ["hades"], [], main.Summary())
+
+
+def test_fetch_games_skips_igdb_when_there_is_nothing_to_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = MagicMock()
+    monkeypatch.setattr(igdb_notion, "IGDBSession", session)
+
+    assert not main.fetch_games(SETTINGS, [], [], main.Summary())
+    session.assert_not_called()
+
+
+def test_failed_lookups_still_create_the_game(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(*_: object, **__: object) -> None:
+        raise KeyError
+
+    monkeypatch.setattr(hltb_notion.HLTBNotionPage, "get_best_match", fail)
+    create = MagicMock()
+    monkeypatch.setattr(custom_notion.CustomGamePage, "retrieve_or_create_from_data", create)
+    steam_spy = MagicMock(spec=steamspy_notion.SteamSpySession)
+    steam_spy.get_steam_spy_data.side_effect = requests.ConnectionError
+    game = proto.Game(id=1, name="Hades", external_games=[_external_game(1, "1145360")])
+    summary = main.Summary()
+
+    main.sync_game(game, steam_spy, summary)
+
+    assert create.call_args.args == (custom_notion.CustomGame(game),)
+    assert summary.incomplete == ["Hades (HowLongToBeat)", "Hades (Steam Spy)"]
+
+
+def test_release_year_reaches_the_hltb_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    match = MagicMock(return_value=None)
+    monkeypatch.setattr(hltb_notion.HLTBNotionPage, "get_best_match", match)
+    monkeypatch.setattr(custom_notion.CustomGamePage, "retrieve_or_create_from_data", MagicMock())
+    released = dt.datetime(2020, 9, 17, tzinfo=dt.UTC)
+
+    main.sync_game(
+        proto.Game(id=1, name="Hades", first_release_date=released),
+        MagicMock(spec=steamspy_notion.SteamSpySession),
+        main.Summary(),
+    )
+
+    match.assert_called_once_with("Hades", 2020)
+
+
+def test_a_failing_game_does_not_stop_the_others(monkeypatch: pytest.MonkeyPatch) -> None:
+    def sync(game: proto.Game, *_: object) -> SimpleNamespace:
+        if game.name == "Bad":
+            raise ValueError(game.name)
+        return SimpleNamespace(url="https://notion.so/page")
+
+    monkeypatch.setattr(main, "sync_game", sync)
+    summary = main.Summary()
+
+    main.sync_games([proto.Game(id=1, name="Bad"), proto.Game(id=2, name="Good")], summary)
+
+    assert summary.failed == ["Bad"]
+    assert summary.written == 1
+
+
+def test_find_imported_follows_the_library_relations(monkeypatch: pytest.MonkeyPatch) -> None:
+    igdb_page = SimpleNamespace(props={"ID": 1.0, "Slug": "hades"})
+    steam_page = SimpleNamespace(props={"ID": 1145360.0})
+    pages = [
+        SimpleNamespace(props={"IGDB": [igdb_page], "Steam Spy": [steam_page]}),
+        SimpleNamespace(props={"IGDB": [], "Steam Spy": []}),  # A row added by hand
+    ]
+    data_sources: dict[type[notion.NotionPageType[Any]], list[SimpleNamespace]] = {
+        igdb_notion.Game: [igdb_page],
+        steamspy_notion.SteamSpyNotionPage: [steam_page],
+        custom_notion.CustomGamePage: pages,
+    }
+    for page_type, results in data_sources.items():
+        data_source = SimpleNamespace(get_all_pages=lambda results=results: results)
+        monkeypatch.setattr(page_type.schema, "_ds", data_source)
+
+    assert custom_notion.find_imported() == custom_notion.Imported(
+        frozenset({1}), frozenset({"hades"}), frozenset({"1145360"})
+    )
