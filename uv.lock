@@ -1483,7 +1483,7 @@ wheels = [
 [[package]]
 name = "notion-videogames"
 version = "0.1"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "betterproto2" },
     { name = "howlongtobeatpy" },

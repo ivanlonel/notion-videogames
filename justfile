@@ -42,10 +42,10 @@ proto:
         --python_betterproto2_out=notion_videogames/proto \
         downloads/igdbapi.proto
 
-[doc('Run the main application')]
-run:
-    @{{ title }} "Running main.py..."
-    uv run -m notion_videogames.main
+[doc('Run the main application (examples: `just run --dry-run` or `just run --limit 5`)')]
+run *args:
+    @{{ title }} "Running notion-videogames..."
+    uv run notion-videogames {{ args }}
 
 [doc('Update uv.lock to reflect the latest compatible versions of dependencies listed in pyproject.toml')]
 [group('Dependencies')]
@@ -57,7 +57,7 @@ lock:
 [group('Dependencies')]
 uv-export:
     {{ title }} "Exporting runtime dependencies to requirements.txt..."
-    uv export --frozen --no-dev --output-file=requirements.txt
+    uv export --frozen --no-dev --no-emit-project --output-file=requirements.txt
 
 [doc('Install project dependencies, ensuring that installed versions are compatible with uv.lock')]
 [group('Dependencies')]
