@@ -18,7 +18,7 @@ from ultimate_notion.config import get_or_create_cfg
 from ultimate_notion.errors import UltimateNotionError
 from ultimate_notion.schema import MultiSelect, Select
 
-from notion_videogames import custom_notion, hltb_notion, igdb_notion, notion, steamspy_notion
+from notion_videogames import custom_notion, hltb_notion, igdb_notion, notion, steam_notion
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -110,7 +110,7 @@ DB_PAGE_TYPES: Final[dict[str, type[notion.NotionPageType[Any]]]] = {
     # "Test Dummies": igdb_notion.TestDummy,
     # "Searches": igdb_notion.Search,
     "HowLongToBeat Games": hltb_notion.HLTBNotionPage,
-    "Steam Spy Games": steamspy_notion.SteamSpyNotionPage,
+    "Steam Games": steam_notion.SteamNotionPage,
 }
 
 
@@ -144,6 +144,7 @@ class Summary:
     failed: list[str] = field(default_factory=list)
     incomplete: list[str] = field(default_factory=list)
     not_on_igdb: list[str] = field(default_factory=list)
+    not_on_steam: list[str] = field(default_factory=list)
     unrecognized: list[str] = field(default_factory=list)
 
     def log(self) -> None:
@@ -157,6 +158,7 @@ class Summary:
             (logging.ERROR, "Failed", self.failed),
             (logging.WARNING, "Lookup failed, use --update to fill the link in", self.incomplete),
             (logging.WARNING, "Not found on IGDB", self.not_on_igdb),
+            (logging.WARNING, "Not on Steam any more, page left as it was", self.not_on_steam),
             (logging.WARNING, "Not IGDB game or Steam app URLs", self.unrecognized),
         ):
             if items:
@@ -333,9 +335,7 @@ def _lookup[T](
         return None
 
 
-def sync_game(
-    game: proto.Game, steam_spy: steamspy_notion.SteamSpySession, summary: Summary
-) -> uno.Page:
+def sync_game(game: proto.Game, steam: steam_notion.SteamSession, summary: Summary) -> uno.Page:
     release = game.first_release_date
     steam_id = igdb_notion.get_steam_app_id(game)
 
@@ -347,23 +347,21 @@ def sync_game(
             game.name, release.year if release else None
         ),
     )
-    steam_spy_match = (
-        _lookup("Steam Spy", game, summary, lambda: steam_spy.get_steam_spy_data(steam_id))
-        if steam_id
-        else None
+    steam_match = (
+        _lookup("Steam", game, summary, lambda: steam.get_game(steam_id)) if steam_id else None
     )
 
     return custom_notion.CustomGamePage.retrieve_or_create_from_data(
-        custom_notion.CustomGame(game, hltb_match, steam_spy_match)
+        custom_notion.CustomGame(game, hltb_match, steam_match)
     )
 
 
 def sync_games(games: list[proto.Game], summary: Summary) -> None:
-    with steamspy_notion.SteamSpySession() as steam_spy:
+    with steam_notion.SteamSession() as steam:
         for position, game in enumerate(games, start=1):
             progress = f"[{position}/{len(games)}] {game.name}"
             try:
-                page = sync_game(game, steam_spy, summary)
+                page = sync_game(game, steam, summary)
             except Exception:  # pylint: disable=broad-exception-caught
                 # One bad game shouldn't stop the rest. A later run retries it.
                 logger.exception("%s: failed", progress)
@@ -373,14 +371,80 @@ def sync_games(games: list[proto.Game], summary: Summary) -> None:
                 summary.written += 1
 
 
+def refresh_steam_pages(summary: Summary, *, limit: int | None, dry_run: bool) -> None:
+    """Rewrite every page of the Steam database from Steam, and nothing else."""
+    page_type = steam_notion.SteamNotionPage
+    pages = list(notion.retry_transient(page_type.schema.get_ds().get_all_pages)())[:limit]
+    if dry_run:
+        logger.info("Would refresh %d Steam pages.", len(pages))
+        return
+
+    page_type.update = True
+    # ponytail: one GetItems call per game. Batching saves about 2 minutes on a full refresh.
+    with steam_notion.SteamSession() as steam:
+        for position, page in enumerate(pages, start=1):
+            title = str(page.title)
+            progress = f"[{position}/{len(pages)}] {title}"
+            try:
+                game = steam.get_game(int(page.props["ID"]))
+                if game is None:
+                    logger.warning("%s: not on Steam any more", progress)
+                    summary.not_on_steam.append(title)
+                    continue
+                page_type.retrieve_or_create_from_data(game)
+            except Exception:  # pylint: disable=broad-exception-caught
+                # One bad page shouldn't stop the rest. A later run retries it.
+                logger.exception("%s: failed", progress)
+                summary.failed.append(title)
+            else:
+                logger.info("%s: %s", progress, page.url)
+                summary.written += 1
+
+
+def import_games(
+    args: argparse.Namespace,
+    settings: Settings,
+    session: uno.Session,
+    summary: Summary,
+    *,
+    can_read_library: bool,
+) -> None:
+    source = read_source_urls(session, settings.source_db_id)
+    summary.unrecognized = source.unrecognized
+
+    imported = (
+        custom_notion.find_imported()
+        if can_read_library and not args.update
+        else custom_notion.Imported()
+    )
+    slugs = [slug for slug in source.slugs if slug not in imported.slugs]
+    steam_app_ids = [
+        app_id for app_id in source.steam_app_ids if app_id not in imported.steam_app_ids
+    ]
+    summary.already_imported = (
+        len(source.slugs) + len(source.steam_app_ids) - len(slugs) - len(steam_app_ids)
+    )
+
+    games = fetch_games(settings, slugs[: args.limit], steam_app_ids[: args.limit], summary)
+
+    # Reachable with a Steam URL whose game has no Steam page yet, so it never looks imported.
+    pending = [game for game in games if game.id not in imported.igdb_ids]
+    summary.already_imported += len(games) - len(pending)
+    pending = pending[: args.limit]
+
+    if args.dry_run:
+        verb = "update or create" if args.update else "create"
+        for game in pending:
+            logger.info("Would %s: %s", verb, game.name)
+    else:
+        sync_games(pending, summary)
+
+
 def run(args: argparse.Namespace, settings: Settings) -> Summary:
     summary = Summary()
     page_types = DB_PAGE_TYPES | {settings.main_games_db_name: custom_notion.CustomGamePage}
 
     with uno.Session.get_or_create() as session:
-        source = read_source_urls(session, settings.source_db_id)
-        summary.unrecognized = source.unrecognized
-
         missing = bind_databases(
             session,
             session.get_page(settings.main_page_id),
@@ -392,32 +456,12 @@ def run(args: argparse.Namespace, settings: Settings) -> Summary:
             logger.info("%s %d databases: %s", verb, len(missing), ", ".join(missing))
 
         # A dry run leaves missing databases unbound, and there's no reading unbound databases.
-        imported = (
-            custom_notion.Imported()
-            if args.update or (args.dry_run and missing)
-            else custom_notion.find_imported()
-        )
-        slugs = [slug for slug in source.slugs if slug not in imported.slugs]
-        steam_app_ids = [
-            app_id for app_id in source.steam_app_ids if app_id not in imported.steam_app_ids
-        ]
-        summary.already_imported = (
-            len(source.slugs) + len(source.steam_app_ids) - len(slugs) - len(steam_app_ids)
-        )
+        can_read_library = not (args.dry_run and missing)
 
-        games = fetch_games(settings, slugs[: args.limit], steam_app_ids[: args.limit], summary)
-
-        # Reachable with Steam URLs whose game Steam Spy doesn't know, so they never look imported.
-        pending = [game for game in games if game.id not in imported.igdb_ids]
-        summary.already_imported += len(games) - len(pending)
-        pending = pending[: args.limit]
-
-        if args.dry_run:
-            verb = "update or create" if args.update else "create"
-            for game in pending:
-                logger.info("Would %s: %s", verb, game.name)
-        else:
-            sync_games(pending, summary)
+        if not args.refresh_steam:
+            import_games(args, settings, session, summary, can_read_library=can_read_library)
+        elif can_read_library:
+            refresh_steam_pages(summary, limit=args.limit, dry_run=args.dry_run)
 
     return summary
 
@@ -433,12 +477,18 @@ def _positive_int(value: str) -> int:
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="notion-videogames",
-        description="Import videogames into Notion from IGDB, HowLongToBeat and Steam Spy.",
+        description="Import videogames into Notion from IGDB, HowLongToBeat and Steam.",
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--update",
         action="store_true",
         help="also refresh pages that already exist, instead of only creating missing ones",
+    )
+    mode.add_argument(
+        "--refresh-steam",
+        action="store_true",
+        help="only rewrite every page of the Steam database with Steam's current data",
     )
     parser.add_argument(
         "--limit",

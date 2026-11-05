@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project purpose
 
-Populates a videogame library in Notion. Reads a source Notion database for URLs pointing to IGDB game slugs and Steam app IDs, fetches metadata from IGDB (over the Twitch OAuth-authenticated API), HowLongToBeat, and SteamSpy, then creates/updates a constellation of related Notion databases under a configured root page.
+Populates a videogame library in Notion. Reads a source Notion database for URLs pointing to IGDB game slugs and Steam app IDs, fetches metadata from IGDB (over the Twitch OAuth-authenticated API), HowLongToBeat, and Steam, then creates/updates a constellation of related Notion databases under a configured root page.
 
 ## Tooling and commands
 
 Dependencies are managed with `uv` (lockfile-driven); tasks are exposed through `just` (PowerShell-backed `justfile`). Run `just` with no recipe to list everything.
 
 - `just sync` — install dev deps from `uv.lock` (`uv sync --frozen`)
-- `just run [flags]` — `uv run notion-videogames`, with `--dry-run`, `--limit N`, `--update`, `-v`
+- `just run [flags]` — `uv run notion-videogames`, with `--dry-run`, `--limit N`, `--update`, `--refresh-steam`, `-v`
 - `just lock` — `uv lock --upgrade` (and `just uv-export` to refresh `requirements.txt`). To change a dependency without upgrading everything else, use plain `uv lock`.
 - `just qa` — runs `format` → `lint` → `type-check` → `test` in sequence
   - `just format` — `ty check --fix`, `ruff check --fix`, `ruff format`
@@ -55,9 +55,11 @@ Renovate (`.github/renovate.json`) works together with the **Post-Renovate Hooks
 2. For every database title in `DB_PAGE_TYPES` plus the main one, either create it under `MAIN_PAGE_ID` or rebind the existing one via `rebind_db`. That merges existing Select/MultiSelect options into the schema, since `ultimate_notion` doesn't, and tolerates columns added by hand in Notion. The dict's order matters: a database must come after the ones its relations point to.
 3. `custom_notion.find_imported` reads the library once, so that only what's missing gets fetched. `--update` skips this and goes through everything.
 4. Query IGDB's protobuf endpoints in batches of 25: `games.pb` by slug, and `external_games.pb` with `external_game_source=1` (Steam) by app id, pulling the linked IGDB game in the same response.
-5. For each game, retrieve the HowLongToBeat best match and (if a Steam id is present) SteamSpy data, then upsert one `CustomGamePage`.
+5. For each game, retrieve the HowLongToBeat best match and (if a Steam id is present) Steam's data, then upsert one `CustomGamePage`.
 
-A failed game or IGDB batch is logged and reported at the end, and the exit status is 1. A failed HLTB or SteamSpy lookup still creates the game, without that link. Rejected requests (4xx) and schema mismatches end the run with a one-line message (`-v` for the traceback).
+`--refresh-steam` replaces steps 3–5: after binding, it rewrites every page of `Steam Games` from Steam. It's the only way to reach games that aren't in the source database, and it touches nothing else.
+
+A failed game or IGDB batch is logged and reported at the end, and the exit status is 1. A failed HLTB or Steam lookup still creates the game, without that link. Rejected requests (4xx) and schema mismatches end the run with a one-line message (`-v` for the traceback).
 
 A no-op rerun still costs about two GETs per database: `root_page.sub_dss` resolves each one, and that's inside `ultimate_notion`.
 
@@ -66,8 +68,8 @@ A no-op rerun still costs about two GETs per database: `root_page.sub_dss` resol
 - `notion.py` — abstract base `NotionPageType[T]`, which owns the `retrieve_or_create_from_data` flow. Its `_pages` map (keyed by page type and source id) makes each page get looked up and written once per run. `retry_transient` covers 409, 429, 5xx, timeouts and transport errors, and wraps single API calls only: related pages get resolved between those calls, because a retry around that recursion would multiply attempts at every nesting level. `--update` sets the `update` class variable.
 - `igdb_notion.py` — `IGDBSession`, plus a schema and a `NotionPageType` subclass per IGDB protobuf message (Game, Platform, Cover, etc.). `IGDBNotionPage` builds properties and query fields from the schema alone; subclasses declare only an `image` rule or a `computed` value.
 - `hltb_notion.py` — `HowLongToBeatGame` dataclass + `HLTBNotionPage`; performs best-match lookup against the HLTB API by game name, requiring `MIN_SIMILARITY` and breaking ties by release year.
-- `steamspy_notion.py` — `SteamSpyGame` dataclass + `SteamSpyNotionPage` + `SteamSpySession` (a `requests.Session` with retry adapter).
-- `custom_notion.py` — the user-facing "Custom Game" schema. Aggregates IGDB/HLTB/SteamSpy relations with rollup properties (playtime, ratings, etc.) and adds personal-tracking props (Owned, Notes, "VAMOS JOGAR"). Also has `find_imported`.
+- `steam_notion.py` — `SteamGame` dataclass + `SteamNotionPage` + `SteamSession` (a `requests.Session` with retry adapter). `get_game` costs 4 to 6 calls per game. It returns `None` if Steam doesn't have the app and raises if a request fails.
+- `custom_notion.py` — the user-facing "Custom Game" schema. Aggregates IGDB/HLTB/Steam relations with rollup properties (playtime, ratings, etc.) and adds personal-tracking props (Owned, Notes, "VAMOS JOGAR"). Also has `find_imported`.
 - `proto/` — generated `betterproto2` output for `igdbapi.proto`. Excluded from ruff, flake8, pylint, deptry, and mypy (the relevant tools all have explicit excludes). Never hand-edit; regenerate with `just proto`.
 
 ### Notion model conventions
@@ -87,7 +89,12 @@ It mirrors the sources, so IGDB removing a value or a list entry clears it in No
 
 Checked against live APIs in November 2026:
 
-- **Steam Spy** stopped reporting playtime around April 2026: `average_*` and `median_*` are 0 for every game, even Counter-Strike 2, while CCU, reviews and owners stay real. `SteamSpyNotionPage` skips zeros so that `--update` can't wipe the figures on about 415 older pages. `score_rank` and `userscore` carry nothing either, on old pages as well as new. Unknown apps answer 200 with `name: null`.
+- **Steam Spy was dropped** because it stopped tracking games. In its export, the library's games from 2024 are all there, 2025 is 13 of 29 and 2026 is 0 of 18. PEAK, with over 300,000 reviews, came back with 0 reviews and `0 .. 20,000` owners, and playtime is 0 on all 82,523 apps. Its old columns (`Owners`, playtime and their `(h)` formulas, `Score Rank`, `User Score`) are no longer in the schema, so they stay in Notion with their values and nothing writes to them. Steam has no equivalent for owners or playtime.
+- **Steam's APIs** need no key but are mostly undocumented, and they move: `appreviews` now redirects to the homepage and `ISteamApps/GetAppList` returns 404.
+  - Review counts follow the store page: `purchase_type` 0 (Steam purchases) for paid games, 1 (all) for free ones. `is_free` is missing on delisted games, so if a total is more than 2% off `review_count`, try the other. Steam Spy's counts were nearer the "all" figure, so counts dropped on many pages when this changed, with ratings nearly unchanged.
+  - `GetItems` answers `success: 15` with an empty name when an app isn't sold in that country, and reports some failures as a 200 with no `store_items`. Use the requested appid, because `appid` can be 0 on delisted games.
+  - Languages and genres come from `appdetails`, which gives names. `GetItems` gives ids, and additional languages like Croatian come as `elanguage: -1` plus a number no list explains. `appdetails` allows about 200 calls per 5 minutes, hence the 1.5-second pause.
+  - Steam writes `Free To Play` where Steam Spy wrote `Free to Play`, so both options exist in Notion.
 - **HowLongToBeat** no longer sends `profile_steam`, `profile_dev` or `comp_lvl_spd`, and `HLTBNotionPage` skips them when absent for the same reason. `search` returns `None` for a failed request and `[]` for no results, and a game's alias counts towards similarity, so `OneShot: World Machine Edition` matches the 2016 `OneShot` at 1.0.
 - **IGDB id 0 is real** for tables that used to be enums (`game_types`, `date_formats`, `company_statuses`), so never test an id for truthiness.
 - **Some IGDB companies are named after another company's id**, such as `id=11986` called "70" (Nintendo's real id). A title like `70 - 868` is IGDB's data, not a mapping bug.
