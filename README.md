@@ -39,7 +39,8 @@ per second. `--update` takes longest, because it also rewrites every page relate
 games took about half an hour.
 
 `--update` only reaches games listed in your source database. `--refresh-steam` covers every game in
-the library, and touches nothing but the Steam data, so use it to keep ratings and prices current.
+the library and touches nothing but the Steam data, so use it to keep ratings and prices current. It
+took about half an hour for 465 games.
 
 ## What to expect
 

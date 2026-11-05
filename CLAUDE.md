@@ -57,7 +57,7 @@ Renovate (`.github/renovate.json`) works together with the **Post-Renovate Hooks
 4. Query IGDB's protobuf endpoints in batches of 25: `games.pb` by slug, and `external_games.pb` with `external_game_source=1` (Steam) by app id, pulling the linked IGDB game in the same response.
 5. For each game, retrieve the HowLongToBeat best match and (if a Steam id is present) Steam's data, then upsert one `CustomGamePage`.
 
-`--refresh-steam` replaces steps 3–5: after binding, it rewrites every page of `Steam Games` from Steam. It's the only way to reach games that aren't in the source database, and it touches nothing else.
+`--refresh-steam` replaces steps 3–5: after binding, it rewrites every page of `Steam Games` from Steam. It's the only way to reach games that aren't in the source database, and it touches nothing else. It took 28 minutes for 465 pages.
 
 A failed game or IGDB batch is logged and reported at the end, and the exit status is 1. A failed HLTB or Steam lookup still creates the game, without that link. Rejected requests (4xx) and schema mismatches end the run with a one-line message (`-v` for the traceback).
 
@@ -94,7 +94,8 @@ Checked against live APIs in November 2026:
   - Review counts follow the store page: `purchase_type` 0 (Steam purchases) for paid games, 1 (all) for free ones. `is_free` is missing on delisted games, so if a total is more than 2% off `review_count`, try the other. Steam Spy's counts were nearer the "all" figure, so counts dropped on many pages when this changed, with ratings nearly unchanged.
   - `GetItems` answers `success: 15` with an empty name when an app isn't sold in that country, and reports some failures as a 200 with no `store_items`. Use the requested appid, because `appid` can be 0 on delisted games.
   - Languages and genres come from `appdetails`, which gives names. `GetItems` gives ids, and additional languages like Croatian come as `elanguage: -1` plus a number no list explains. `appdetails` allows about 200 calls per 5 minutes, hence the 1.5-second pause.
-  - Steam writes `Free To Play` where Steam Spy wrote `Free to Play`, so both options exist in Notion.
+  - Notion allows 100 options per multi-select and Steam doesn't stop there: Öoo lists 103 languages. `SteamNotionPage` keeps the first 100.
+  - Steam writes `Free To Play` where Steam Spy wrote `Free to Play`, so both options exist in Notion, and page names now carry Steam's ™ and ®.
 - **HowLongToBeat** no longer sends `profile_steam`, `profile_dev` or `comp_lvl_spd`, and `HLTBNotionPage` skips them when absent for the same reason. `search` returns `None` for a failed request and `[]` for no results, and a game's alias counts towards similarity, so `OneShot: World Machine Edition` matches the 2016 `OneShot` at 1.0.
 - **IGDB id 0 is real** for tables that used to be enums (`game_types`, `date_formats`, `company_statuses`), so never test an id for truthiness.
 - **Some IGDB companies are named after another company's id**, such as `id=11986` called "70" (Nintendo's real id). A title like `70 - 868` is IGDB's data, not a mapping bug.
