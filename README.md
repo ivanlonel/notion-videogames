@@ -48,8 +48,6 @@ took about half an hour for 465 games.
   picks up where it stopped. Existing pages aren't touched unless you pass `--update`.
 - **`--update` keeps what it can't replace.** If a lookup fails or finds nothing, the link already
   on the page stays. Your own columns are never written to.
-- **Owner estimates and playtime are frozen.** They came from Steam Spy, which stopped tracking them,
-  and Steam has no equivalent. Pages that have them keep them, and new games leave them empty.
 - **Add your own columns.** Columns you add to the generated databases in Notion are left alone.
   Renaming, retyping or removing the ones this tool created makes the next run stop with an error
   listing the differences, because it would no longer know where to write.
