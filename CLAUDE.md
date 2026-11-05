@@ -101,6 +101,7 @@ Checked against live APIs in November 2026:
 - **Some IGDB companies are named after another company's id**, such as `id=11986` called "70" (Nintendo's real id). A title like `70 - 868` is IGDB's data, not a mapping bug.
 - **12 databases hold a blank `id=0` page** (titles like `0`, `None`, ` - 0`; empty `Checksum`) left by versions from 2024–2025. Older pages still link to them, and `--update` keeps those links because an absent single relation is left out. The current code shouldn't add more, because unset nested messages come back as `None`.
 - With the current Notion sharing, every run logs a `Could not find page` warning. It's `ultimate_notion` looking up a parent page the integration can't see, and it's harmless.
+- **A column removed through the API** (`session.api.data_sources.update(ds.obj_ref, schema={name: None})`) goes to `Deleted properties` in Notion, as one deleted in the UI does, which Notion's docs don't mention. Restoring one from there hasn't been tried.
 
 ## Code style notes (in addition to what the tooling enforces)
 
