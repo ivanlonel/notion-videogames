@@ -1270,3 +1270,15 @@ def test_refresh_touches_neither_the_source_nor_igdb(monkeypatch: pytest.MonkeyP
 
     refresh.assert_called_once()
     import_games.assert_not_called()
+
+
+def test_steam_page_caps_options_at_notions_limit(caplog: pytest.LogCaptureFixture) -> None:
+    languages = tuple(f"Language {i}" for i in range(steam_notion.MAX_OPTIONS + 3))
+
+    with caplog.at_level(logging.WARNING):
+        properties = steam_notion.SteamNotionPage.get_populated_properties_dict(
+            steam_notion.SteamGame(appid=1, name="Many", languages=languages)
+        )
+
+    assert len(properties["Languages"].value) == steam_notion.MAX_OPTIONS
+    assert "Many has 103 Languages" in caplog.text

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import re
 import time
 from http import HTTPStatus
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, Final, override
 
 import requests
 import requests.adapters
@@ -15,6 +16,11 @@ from pydantic.dataclasses import dataclass
 from ultimate_notion import PropType, props
 
 from notion_videogames import notion
+
+logger: logging.Logger = logging.getLogger(__name__)
+
+# https://developers.notion.com/reference/request-limits
+MAX_OPTIONS: Final[int] = 100
 
 
 @dataclass(frozen=True)
@@ -237,6 +243,15 @@ class SteamNotionPage(notion.NotionPageType[SteamGame], schema=SteamNotionPageSc
         reviews = {"Positive": data.positive, "Negative": data.negative}
         texts = {"Developer": data.developer, "Publisher": data.publisher}
         options = {"Languages": data.languages, "Genres": data.genres, "Tags": data.tags}
+        for name, value in options.items():
+            if len(value) > MAX_OPTIONS:
+                logger.warning(
+                    "%s has %d %s, keeping the first %d (Notion's limit)",
+                    data.name,
+                    len(value),
+                    name,
+                    MAX_OPTIONS,
+                )
         return (
             {"ID": props.Number(data.appid), "Name": props.Title(data.name)}
             | {name: props.Number(value) for name, value in numbers.items() if value is not None}
@@ -246,7 +261,11 @@ class SteamNotionPage(notion.NotionPageType[SteamGame], schema=SteamNotionPageSc
                 else {}
             )
             | {name: props.Text(value) for name, value in texts.items() if value}
-            | {name: props.MultiSelect(value) for name, value in options.items() if value}
+            | {
+                name: props.MultiSelect(value[:MAX_OPTIONS])
+                for name, value in options.items()
+                if value
+            }
         )
 
     @override
