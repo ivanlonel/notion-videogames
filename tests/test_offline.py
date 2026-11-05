@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import json
 import logging
 import types
 import typing
@@ -29,7 +30,7 @@ from notion_videogames import (
     igdb_notion,
     main,
     notion,
-    steamspy_notion,
+    steam_notion,
 )
 from notion_videogames.proto import proto
 
@@ -41,50 +42,6 @@ type PageType = type[igdb_notion.IGDBNotionPage[Any]]
 IGDB_PAGE_TYPES = igdb_notion.IGDBNotionPage.__subclasses__()
 
 # Real responses, with long lists trimmed.
-STEAMSPY_KNOWN_APP: dict[str, Any] = {
-    "appid": 620,
-    "name": "Portal 2",
-    "developer": "Valve",
-    "publisher": "Valve",
-    "score_rank": "",
-    "positive": 427835,
-    "negative": 5675,
-    "userscore": 0,
-    "owners": "5,000,000 .. 10,000,000",
-    "average_forever": 0,
-    "average_2weeks": 0,
-    "median_forever": 0,
-    "median_2weeks": 0,
-    "price": "999",
-    "initialprice": "999",
-    "discount": "0",
-    "ccu": 1959,
-    "languages": "English, French",
-    "genre": "Action, Adventure",
-    "tags": {"Platformer": 7477, "Puzzle": 7394},
-}
-STEAMSPY_UNKNOWN_APP: dict[str, Any] = {
-    "appid": 1,
-    "name": None,
-    "developer": "",
-    "publisher": "",
-    "score_rank": "",
-    "positive": 0,
-    "negative": 0,
-    "userscore": 0,
-    "owners": "0 .. 20,000",
-    "average_forever": 0,
-    "average_2weeks": 0,
-    "median_forever": 0,
-    "median_2weeks": 0,
-    "price": None,
-    "initialprice": None,
-    "discount": None,
-    "ccu": 0,
-    "languages": None,
-    "genre": None,
-    "tags": [],
-}
 HLTB_ENTRY: dict[str, Any] = {
     "game_id": 7231,
     "game_name": "Portal 2",
@@ -473,8 +430,22 @@ def test_custom_game_without_matches_leaves_those_links_alone(
             hltb_notion.HowLongToBeatGame.from_dict(HLTB_ENTRY | {"similarity": 1.0}),
         ),
         (
-            steamspy_notion.SteamSpyNotionPage,
-            steamspy_notion.SteamSpyGame.from_dict(STEAMSPY_KNOWN_APP),
+            steam_notion.SteamNotionPage,
+            steam_notion.SteamGame(
+                appid=1,
+                name="A",
+                developer="B",
+                publisher="C",
+                positive=1,
+                negative=1,
+                ccu=1,
+                price=1,
+                initial_price=1,
+                discount=1,
+                languages=("D",),
+                genres=("E",),
+                tags=("F",),
+            ),
         ),
     ],
     ids=lambda value: value.__name__ if isinstance(value, type) else "",
@@ -492,9 +463,13 @@ def test_hand_written_properties_are_writable_schema_props(
 
 
 def _fake_response(
-    *, json_data: object = None, content: bytes = b"", error: Exception | None = None
+    *,
+    json_data: object = None,
+    content: bytes = b"",
+    error: Exception | None = None,
+    status_code: int = 200,
 ) -> MagicMock:
-    response = MagicMock(spec=requests.Response, content=content)
+    response = MagicMock(spec=requests.Response, content=content, status_code=status_code)
     response.json.return_value = json_data
     response.raise_for_status.side_effect = error
     return response
@@ -588,52 +563,6 @@ def test_steam_app_id(external_games: list[proto.ExternalGame], expected: int | 
     game = proto.Game(id=1, external_games=external_games)
 
     assert igdb_notion.get_steam_app_id(game) == expected
-
-
-def test_steam_spy_known_app(monkeypatch: pytest.MonkeyPatch) -> None:
-    session = steamspy_notion.SteamSpySession()
-    monkeypatch.setattr(
-        session, "get", lambda *_, **__: _fake_response(json_data=STEAMSPY_KNOWN_APP)
-    )
-
-    game = session.get_steam_spy_data(620)
-
-    assert game is not None
-    assert game.name == "Portal 2"
-    assert game.price == 999
-    assert game.score_rank is None
-    assert game.languages == ("English", "French")
-    assert game.genres == ("Action", "Adventure")
-    assert game.tags == ("Platformer", "Puzzle")
-
-
-def test_steam_spy_unknown_app_is_no_match(monkeypatch: pytest.MonkeyPatch) -> None:
-    session = steamspy_notion.SteamSpySession()
-    monkeypatch.setattr(
-        session, "get", lambda *_, **__: _fake_response(json_data=STEAMSPY_UNKNOWN_APP)
-    )
-
-    assert session.get_steam_spy_data(1) is None
-
-
-def test_steam_spy_requests_have_a_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
-    session = steamspy_notion.SteamSpySession()
-    get = MagicMock(return_value=_fake_response(json_data=STEAMSPY_UNKNOWN_APP))
-    monkeypatch.setattr(session, "get", get)
-
-    session.get_steam_spy_data(1)
-
-    assert get.call_args.kwargs["timeout"]
-
-
-def test_steam_spy_failed_request_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    session = steamspy_notion.SteamSpySession()
-    monkeypatch.setattr(
-        session, "get", lambda *_, **__: _fake_response(error=requests.HTTPError("500"))
-    )
-
-    with pytest.raises(requests.HTTPError):
-        session.get_steam_spy_data(620)
 
 
 def _hltb_entry(game_id: int, similarity: float, year: int) -> SimpleNamespace:
@@ -923,15 +852,15 @@ def test_failed_lookups_still_create_the_game(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(hltb_notion.HLTBNotionPage, "get_best_match", fail)
     create = MagicMock()
     monkeypatch.setattr(custom_notion.CustomGamePage, "retrieve_or_create_from_data", create)
-    steam_spy = MagicMock(spec=steamspy_notion.SteamSpySession)
-    steam_spy.get_steam_spy_data.side_effect = requests.ConnectionError
+    steam = MagicMock(spec=steam_notion.SteamSession)
+    steam.get_game.side_effect = requests.ConnectionError
     game = proto.Game(id=1, name="Hades", external_games=[_external_game(1, "1145360")])
     summary = main.Summary()
 
-    main.sync_game(game, steam_spy, summary)
+    main.sync_game(game, steam, summary)
 
     assert create.call_args.args == (custom_notion.CustomGame(game),)
-    assert summary.incomplete == ["Hades (HowLongToBeat)", "Hades (Steam Spy)"]
+    assert summary.incomplete == ["Hades (HowLongToBeat)", "Hades (Steam)"]
 
 
 def test_release_year_reaches_the_hltb_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -942,7 +871,7 @@ def test_release_year_reaches_the_hltb_lookup(monkeypatch: pytest.MonkeyPatch) -
 
     main.sync_game(
         proto.Game(id=1, name="Hades", first_release_date=released),
-        MagicMock(spec=steamspy_notion.SteamSpySession),
+        MagicMock(spec=steam_notion.SteamSession),
         main.Summary(),
     )
 
@@ -968,12 +897,12 @@ def test_find_imported_follows_the_library_relations(monkeypatch: pytest.MonkeyP
     igdb_page = SimpleNamespace(props={"ID": 1.0, "Slug": "hades"})
     steam_page = SimpleNamespace(props={"ID": 1145360.0})
     pages = [
-        SimpleNamespace(props={"IGDB": [igdb_page], "Steam Spy": [steam_page]}),
-        SimpleNamespace(props={"IGDB": [], "Steam Spy": []}),  # A row added by hand
+        SimpleNamespace(props={"IGDB": [igdb_page], "Steam": [steam_page]}),
+        SimpleNamespace(props={"IGDB": [], "Steam": []}),  # A row added by hand
     ]
     data_sources: dict[type[notion.NotionPageType[Any]], list[SimpleNamespace]] = {
         igdb_notion.Game: [igdb_page],
-        steamspy_notion.SteamSpyNotionPage: [steam_page],
+        steam_notion.SteamNotionPage: [steam_page],
         custom_notion.CustomGamePage: pages,
     }
     for page_type, results in data_sources.items():
@@ -983,27 +912,6 @@ def test_find_imported_follows_the_library_relations(monkeypatch: pytest.MonkeyP
     assert custom_notion.find_imported() == custom_notion.Imported(
         frozenset({1}), frozenset({"hades"}), frozenset({"1145360"})
     )
-
-
-PLAYTIME_COLUMNS = {"Average Forever", "Average 2 Weeks", "Median Forever", "Median 2 Weeks"}
-
-
-def test_steam_spy_reporting_no_playtime_keeps_what_pages_already_hold() -> None:
-    properties = steamspy_notion.SteamSpyNotionPage.get_populated_properties_dict(
-        steamspy_notion.SteamSpyGame.from_dict(STEAMSPY_KNOWN_APP)
-    )
-
-    assert not PLAYTIME_COLUMNS & set(properties)
-    assert properties["CCU"].value == STEAMSPY_KNOWN_APP["ccu"]
-
-
-def test_steam_spy_playtime_is_written_when_reported() -> None:
-    properties = steamspy_notion.SteamSpyNotionPage.get_populated_properties_dict(
-        steamspy_notion.SteamSpyGame.from_dict(STEAMSPY_KNOWN_APP | {"average_forever": 430})
-    )
-
-    assert properties["Average Forever"].value == 430
-    assert not PLAYTIME_COLUMNS - {"Average Forever"} & set(properties)
 
 
 def test_hltb_fields_it_no_longer_sends_keep_what_pages_already_hold() -> None:
@@ -1026,3 +934,339 @@ def test_hltb_fields_are_written_when_sent() -> None:
     assert properties["Steam ID"].value == 620
     assert properties["comp_lvl_spd"].value == 1
     assert "Profile Devs" in properties
+
+
+# Real responses from Steam, with long lists trimmed.
+HITMAN: dict[str, Any] = {
+    "id": 6860,
+    "success": 1,
+    "name": "Hitman: Blood Money",
+    "type": 0,
+    "best_purchase_option": {
+        "final_price_in_cents": "99",
+        "original_price_in_cents": "999",
+        "discount_pct": 90,
+    },
+    "basic_info": {
+        "publishers": [{"name": "Io-Interactive A/S"}],
+        "developers": [{"name": "Io-Interactive A/S"}],
+    },
+    "reviews": {"summary_filtered": {"review_count": 13828, "percent_positive": 93}},
+    "tags": [
+        {"tagid": 1687, "weight": 1865},
+        {"tagid": 19, "weight": 1124},
+        {"tagid": 7, "weight": 1},
+    ],
+}
+COUNTER_STRIKE: dict[str, Any] = {
+    "id": 730,
+    "success": 1,
+    "name": "Counter-Strike 2",
+    "is_free": True,
+    "type": 0,
+    "basic_info": {"publishers": [{"name": "Valve"}], "developers": [{"name": "Valve"}]},
+    "reviews": {"summary_filtered": {"review_count": 9969034, "percent_positive": 85}},
+}
+NOT_SOLD: dict[str, Any] = {"item_type": 0, "id": 1, "success": 15, "visible": False, "name": ""}
+TAG_LIST = [{"tagid": 1687, "name": "Stealth"}, {"tagid": 19, "name": "Action"}]
+LANGUAGES_TEXT = (
+    "English<strong>*</strong>, French<strong>*</strong>, Spanish - Spain<strong>*</strong>, "
+    "Czech, Polish<br><strong>*</strong>languages with full audio support"
+)
+
+
+class FakeSteam:
+    """Answers a SteamSession's requests from fixed data, keeping what was asked."""
+
+    def __init__(
+        self,
+        items: dict[str, dict[str, Any]],
+        reviews: dict[int, tuple[int, int]] | None = None,
+        details: object = None,
+    ) -> None:
+        self.items = items
+        self.reviews = reviews or {}
+        self.details = details
+        self.players: tuple[int, dict[str, Any]] = (200, {"response": {"player_count": 98}})
+        self.calls: list[dict[str, Any]] = []
+
+    def get(self, url: str, *, params: dict[str, Any], timeout: float) -> MagicMock:
+        self.calls.append({"url": url, "params": params, "timeout": timeout})
+        body = json.loads(params.get("input_json", "{}"))
+        if "GetItems" in url:
+            item = self.items.get(body["context"]["country_code"], NOT_SOLD)
+            return _fake_response(json_data={"response": {"store_items": [item]}})
+        if "GetAppReviews" in url:
+            positive, negative = self.reviews.get(body["purchase_type"], (0, 0))
+            summary = {"total_positive": positive, "total_negative": negative}
+            return _fake_response(json_data={"response": {"query_summary": summary}})
+        if "GetTagList" in url:
+            return _fake_response(json_data={"response": {"tags": TAG_LIST}})
+        if "GetNumberOfCurrentPlayers" in url:
+            return _fake_response(json_data=self.players[1], status_code=self.players[0])
+        assert "appdetails" in url
+        return _fake_response(json_data=self.details)
+
+    def purchase_types(self) -> list[int]:
+        bodies = [
+            json.loads(c["params"]["input_json"]) for c in self.calls if "Reviews" in c["url"]
+        ]
+        return [body["purchase_type"] for body in bodies]
+
+
+def _steam_session(monkeypatch: pytest.MonkeyPatch, fake: FakeSteam) -> steam_notion.SteamSession:
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    session = steam_notion.SteamSession()
+    monkeypatch.setattr(session, "get", fake.get)
+    return session
+
+
+def _details(app_id: int) -> dict[str, Any]:
+    genres = [{"id": "1", "description": "Action"}, {"id": "25", "description": "Adventure"}]
+    data = {"supported_languages": LANGUAGES_TEXT, "genres": genres}
+    return {str(app_id): {"success": True, "data": data}}
+
+
+def test_steam_game_on_sale(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeSteam({"US": HITMAN}, {0: (13000, 828)}, _details(6860))
+
+    game = _steam_session(monkeypatch, fake).get_game(6860)
+
+    assert game == steam_notion.SteamGame(
+        appid=6860,
+        name="Hitman: Blood Money",
+        developer="Io-Interactive A/S",
+        publisher="Io-Interactive A/S",
+        positive=13000,
+        negative=828,
+        ccu=98,
+        price=99,
+        initial_price=999,
+        discount=90,
+        languages=("English", "French", "Spanish - Spain", "Czech", "Polish"),
+        genres=("Action", "Adventure"),
+        tags=("Stealth", "Action"),  # Tag 7 isn't in the list of names
+    )
+    assert fake.purchase_types() == [0]
+
+
+def test_steam_free_game_counts_all_reviews_and_costs_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeSteam({"US": COUNTER_STRIKE}, {1: (8544730, 1419062)}, _details(730))
+
+    game = _steam_session(monkeypatch, fake).get_game(730)
+
+    assert game is not None
+    assert (game.price, game.initial_price, game.discount) == (0, 0, 0)
+    assert (game.positive, game.negative) == (8544730, 1419062)
+    assert fake.purchase_types() == [1]
+
+
+def test_steam_full_price_has_no_discount(monkeypatch: pytest.MonkeyPatch) -> None:
+    item = HITMAN | {"best_purchase_option": {"final_price_in_cents": "999"}}
+    fake = FakeSteam({"US": item}, {0: (13000, 828)}, _details(6860))
+
+    game = _steam_session(monkeypatch, fake).get_game(6860)
+
+    assert game is not None
+    assert (game.price, game.initial_price, game.discount) == (999, 999, 0)
+
+
+def test_steam_game_not_on_sale_has_no_price(monkeypatch: pytest.MonkeyPatch) -> None:
+    item = {key: value for key, value in HITMAN.items() if key != "best_purchase_option"}
+    fake = FakeSteam({"US": item}, {0: (13000, 828)}, _details(6860))
+
+    game = _steam_session(monkeypatch, fake).get_game(6860)
+
+    assert game is not None
+    assert (game.price, game.initial_price, game.discount) == (None, None, None)
+
+
+def test_steam_reviews_try_the_other_kind_when_they_do_not_fit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeSteam({"US": HITMAN}, {0: (100, 28), 1: (13000, 828)}, _details(6860))
+
+    game = _steam_session(monkeypatch, fake).get_game(6860)
+
+    assert game is not None
+    assert (game.positive, game.negative) == (13000, 828)
+    assert fake.purchase_types() == [0, 1]
+
+
+def test_steam_falls_back_to_the_next_store_without_its_prices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeSteam({"BR": HITMAN}, {0: (13000, 828)}, _details(6860))
+
+    game = _steam_session(monkeypatch, fake).get_game(6860)
+
+    assert game is not None
+    assert game.name == "Hitman: Blood Money"
+    assert game.price is None
+
+
+def test_steam_game_it_does_not_have_is_no_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeSteam({})
+
+    assert _steam_session(monkeypatch, fake).get_game(1) is None
+    assert [c["url"].count("GetItems") for c in fake.calls] == [1, 1]
+
+
+def test_steam_delisted_game_without_details_keeps_what_it_has(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    details = {"6860": {"success": False}}
+    fake = FakeSteam({"US": HITMAN}, {0: (13000, 828)}, details)
+
+    game = _steam_session(monkeypatch, fake).get_game(6860)
+
+    assert game is not None
+    assert not game.languages
+    assert not game.genres
+
+
+def test_steam_reporting_failure_as_an_empty_answer_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _steam_session(monkeypatch, FakeSteam({}))
+    monkeypatch.setattr(
+        session, "get", lambda *_, **__: _fake_response(json_data={"response": {}})
+    )
+
+    with pytest.raises(LookupError):
+        session.get_game(6860)
+
+
+def test_steam_rate_limiting_details_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeSteam({"US": HITMAN}, {0: (13000, 828)}, None)
+
+    with pytest.raises(LookupError):
+        _steam_session(monkeypatch, fake).get_game(6860)
+
+
+def test_steam_failed_request_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _steam_session(monkeypatch, FakeSteam({}))
+    monkeypatch.setattr(
+        session, "get", lambda *_, **__: _fake_response(error=requests.HTTPError("500"))
+    )
+
+    with pytest.raises(requests.HTTPError):
+        session.get_game(6860)
+
+
+def test_steam_app_without_player_counts_has_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeSteam({"US": HITMAN}, {0: (13000, 828)}, _details(6860))
+    fake.players = (404, {"response": {"result": 42}})
+
+    game = _steam_session(monkeypatch, fake).get_game(6860)
+
+    assert game is not None
+    assert game.ccu is None
+
+
+def test_steam_every_request_has_a_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeSteam({"US": HITMAN}, {0: (13000, 828)}, _details(6860))
+
+    _steam_session(monkeypatch, fake).get_game(6860)
+
+    assert len(fake.calls) >= 5
+    assert all(call["timeout"] for call in fake.calls)
+
+
+def test_steam_page_leaves_out_what_steam_did_not_send() -> None:
+    properties = steam_notion.SteamNotionPage.get_populated_properties_dict(
+        steam_notion.SteamGame(appid=1, name="Delisted")
+    )
+
+    assert set(properties) == {"ID", "Name"}
+
+
+def test_steam_page_writes_a_free_price_and_no_discount() -> None:
+    properties = steam_notion.SteamNotionPage.get_populated_properties_dict(
+        steam_notion.SteamGame(appid=1, name="Free", price=0, initial_price=0, discount=0)
+    )
+
+    assert properties["Price"].value == 0
+    assert properties["Discount"].value == 0
+
+
+def _steam_library(monkeypatch: pytest.MonkeyPatch, *ids: int | None) -> list[SimpleNamespace]:
+    pages = [
+        SimpleNamespace(title=f"Game {i}", url=f"https://notion.so/{i}", props={"ID": app_id})
+        for i, app_id in enumerate(ids)
+    ]
+    data_source = SimpleNamespace(get_all_pages=lambda: pages)
+    monkeypatch.setattr(steam_notion.SteamNotionPage.schema, "_ds", data_source)
+    monkeypatch.setattr(steam_notion.SteamNotionPage, "update", False)
+    return pages
+
+
+def _steam_client(monkeypatch: pytest.MonkeyPatch, *games: object) -> MagicMock:
+    client = MagicMock(spec=steam_notion.SteamSession)
+    client.__enter__.return_value = client
+    client.get_game.side_effect = games
+    monkeypatch.setattr(steam_notion, "SteamSession", lambda: client)
+    return client
+
+
+def test_refresh_rewrites_each_page_and_survives_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    _steam_library(monkeypatch, 1, 2, 3, 4)
+    good = [steam_notion.SteamGame(appid=i, name=str(i)) for i in (1, 4)]
+    client = _steam_client(monkeypatch, good[0], requests.ConnectionError(), None, good[1])
+    write = MagicMock()
+    monkeypatch.setattr(steam_notion.SteamNotionPage, "retrieve_or_create_from_data", write)
+    summary = main.Summary()
+
+    main.refresh_steam_pages(summary, limit=None, dry_run=False)
+
+    assert [call.args[0].appid for call in write.call_args_list] == [1, 4]
+    assert steam_notion.SteamNotionPage.update
+    assert summary.written == 2
+    assert summary.failed == ["Game 1"]
+    assert summary.not_on_steam == ["Game 2"]
+    assert client.get_game.call_count == 4
+
+
+def test_refresh_honours_the_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    _steam_library(monkeypatch, 1, 2, 3)
+    client = _steam_client(monkeypatch, None, None, None)
+    summary = main.Summary()
+
+    main.refresh_steam_pages(summary, limit=2, dry_run=False)
+
+    assert client.get_game.call_count == 2
+
+
+def test_refresh_dry_run_writes_and_fetches_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    _steam_library(monkeypatch, 1, 2)
+    client = _steam_client(monkeypatch)
+    write = MagicMock()
+    monkeypatch.setattr(steam_notion.SteamNotionPage, "retrieve_or_create_from_data", write)
+
+    main.refresh_steam_pages(main.Summary(), limit=None, dry_run=True)
+
+    client.get_game.assert_not_called()
+    write.assert_not_called()
+    assert not steam_notion.SteamNotionPage.update
+
+
+def test_refresh_and_update_are_exclusive() -> None:
+    with pytest.raises(SystemExit):
+        main.parse_args(["--update", "--refresh-steam"])
+
+
+def test_refresh_touches_neither_the_source_nor_igdb(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = MagicMock()
+    session.__enter__.return_value = session
+    monkeypatch.setattr(uno.Session, "get_or_create", lambda: session)
+    monkeypatch.setattr(main, "bind_databases", lambda *_, **__: [])
+    refresh, import_games = MagicMock(), MagicMock()
+    monkeypatch.setattr(main, "refresh_steam_pages", refresh)
+    monkeypatch.setattr(main, "import_games", import_games)
+
+    main.run(main.parse_args(["--refresh-steam"]), SETTINGS)
+
+    refresh.assert_called_once()
+    import_games.assert_not_called()

@@ -5,7 +5,7 @@ requires = [ "uv-build>=0.13,<0.14" ]
 [project]
 name = "notion-videogames"
 version = "0.1"
-description = "Create a videogames library on Notion, importing data from IGDB, SteamSpy and How Long to Beat"
+description = "Create a videogames library on Notion, importing data from IGDB, Steam and How Long to Beat"
 readme = "README.md"
 license = "MIT"
 license-files = [ "LICENSE" ]

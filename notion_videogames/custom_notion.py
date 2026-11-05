@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, override
 import ultimate_notion as uno
 from ultimate_notion import PropType, props
 
-from notion_videogames import hltb_notion, igdb_notion, notion, steamspy_notion
+from notion_videogames import hltb_notion, igdb_notion, notion, steam_notion
 
 if TYPE_CHECKING:
     from ultimate_notion.query import Condition
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class CustomGame:
     igdb: proto.Game
     hltb: hltb_notion.HowLongToBeatGame | None = None
-    steamspy: steamspy_notion.SteamSpyGame | None = None
+    steam: steam_notion.SteamGame | None = None
 
 
 class CustomGamePageSchema(uno.Schema):
@@ -37,7 +37,7 @@ class CustomGamePageSchema(uno.Schema):
     how_long_to_beat = PropType.Relation(
         "How Long to Beat", schema=hltb_notion.HLTBNotionPageSchema
     )
-    steam_spy = PropType.Relation("Steam Spy", schema=steamspy_notion.SteamSpyNotionPageSchema)
+    steam = PropType.Relation("Steam", schema=steam_notion.SteamNotionPageSchema)
     game_type = PropType.Rollup(
         "Game Type",
         relation=igdb,
@@ -65,13 +65,13 @@ class CustomGamePageSchema(uno.Schema):
     )
     steam_rating = PropType.Rollup(
         "Steam Rating",
-        relation=steam_spy,
-        rollup=steamspy_notion.SteamSpyNotionPageSchema.review_percent,
+        relation=steam,
+        rollup=steam_notion.SteamNotionPageSchema.review_percent,
     )
     steam_rating_count = PropType.Rollup(
         "Steam Rating Count",
-        relation=steam_spy,
-        rollup=steamspy_notion.SteamSpyNotionPageSchema.review_count,
+        relation=steam,
+        rollup=steam_notion.SteamNotionPageSchema.review_count,
     )
     hltb_review_score = PropType.Rollup(
         "HLTB Review Score",
@@ -125,18 +125,18 @@ class CustomGamePageSchema(uno.Schema):
     )
     steam_genres = PropType.Rollup(
         "Steam Genres",
-        relation=steam_spy,
-        rollup=steamspy_notion.SteamSpyNotionPageSchema.genres,
+        relation=steam,
+        rollup=steam_notion.SteamNotionPageSchema.genres,
     )
     steam_tags = PropType.Rollup(
         "Steam Tags",
-        relation=steam_spy,
-        rollup=steamspy_notion.SteamSpyNotionPageSchema.tags,
+        relation=steam,
+        rollup=steam_notion.SteamNotionPageSchema.tags,
     )
     steam_languages = PropType.Rollup(
         "Steam Languages",
-        relation=steam_spy,
-        rollup=steamspy_notion.SteamSpyNotionPageSchema.languages,
+        relation=steam,
+        rollup=steam_notion.SteamNotionPageSchema.languages,
     )
     first_release_date = PropType.Rollup(
         "First Release Date",
@@ -155,8 +155,8 @@ class CustomGamePageSchema(uno.Schema):
     )
     steam_url = PropType.Rollup(
         "Steam URL",
-        relation=steam_spy,
-        rollup=steamspy_notion.SteamSpyNotionPageSchema.steam_url,
+        relation=steam,
+        rollup=steam_notion.SteamNotionPageSchema.steam_url,
     )
 
 
@@ -178,9 +178,9 @@ class CustomGamePage(notion.NotionPageType[CustomGame], schema=CustomGamePageSch
             properties["How Long to Beat"] = props.Relations(
                 hltb_notion.HLTBNotionPage.retrieve_or_create_from_data(data.hltb)
             )
-        if data.steamspy is not None:
-            properties["Steam Spy"] = props.Relations(
-                steamspy_notion.SteamSpyNotionPage.retrieve_or_create_from_data(data.steamspy)
+        if data.steam is not None:
+            properties["Steam"] = props.Relations(
+                steam_notion.SteamNotionPage.retrieve_or_create_from_data(data.steam)
             )
         return properties
 
@@ -212,7 +212,7 @@ def find_imported() -> Imported:
     # Reading these two first fills the session's page cache, which is where following relations
     # gets its pages from. Each relation followed below would be an API call otherwise.
     _read_all_pages(igdb_notion.Game)
-    _read_all_pages(steamspy_notion.SteamSpyNotionPage)
+    _read_all_pages(steam_notion.SteamNotionPage)
 
     igdb_ids: set[int] = set()
     slugs: set[str] = set()
@@ -221,7 +221,7 @@ def find_imported() -> Imported:
         for igdb_page in page.props["IGDB"]:
             igdb_ids.add(int(igdb_page.props["ID"] or 0))
             slugs.add(str(igdb_page.props["Slug"]))
-        for steam_page in page.props["Steam Spy"]:
+        for steam_page in page.props["Steam"]:
             steam_app_ids.add(str(int(steam_page.props["ID"] or 0)))
 
     return Imported(frozenset(igdb_ids), frozenset(slugs), frozenset(steam_app_ids))
