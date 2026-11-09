@@ -11,7 +11,7 @@ repos:
       - id: check-useless-excludes
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.13.6
+    rev: 0.13.7
     hooks:
       - id: uv-lock
         name: uv-lock (frozen)
@@ -72,12 +72,12 @@ repos:
       - id: text-unicode-replacement-char
 
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.30.3
+    rev: v2.30.6
     hooks:
       - id: pyproject-fmt
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.3
+    rev: v0.17.4
     hooks:
       - id: ruff-check
         args:
@@ -113,7 +113,7 @@ repos:
           - flake8-raise==0.0.5  # sync-with-uv
           - flake8-simplify==0.31.1  # sync-with-uv
           - flake8-tidy-imports==4.12.0  # sync-with-uv
-          - flake8-type-checking==3.2.0  # sync-with-uv
+          - flake8-type-checking==3.3.0  # sync-with-uv
           - flake8-use-fstring==1.4  # sync-with-uv
           - flake8-useless-assert==0.4.4  # sync-with-uv
           - pep8-naming==0.15.1  # sync-with-uv
