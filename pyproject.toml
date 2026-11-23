@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "uv_build"
-requires = [ "uv-build>=0.13.8,<0.14" ]
+requires = [ "uv-build>=0.13.9,<0.14" ]
 
 [project]
 name = "notion-videogames"
@@ -26,11 +26,11 @@ dependencies = [
   "howlongtobeatpy~=1.0",
   "httpx",                   # Let notion-client dictate httpx's version
   "notion-client",           # Let ultimate-notion dictate notion-client's version
-  "pydantic~=2.14.3",
+  "pydantic~=2.14.4",
   "python-dotenv~=1.2",
   "requests~=2.34",
   "tenacity~=9.2",
-  "ultimate-notion~=0.10.1",
+  "ultimate-notion~=0.11.0",
   "urllib3",                 # Let requests dictate urllib3's version
 ]
 urls.Repository = "https://github.com/ivanlonel/notion-videogames"
@@ -70,7 +70,7 @@ dev = [
   "pytest~=9.2",
   "ruff~=0.17",
   "tryceratops~=2.4",
-  "ty~=0.0.104",
+  "ty~=0.0.107",
   "types-requests~=2.33",
 ]
 # This group lists packages that are not installed in the local environment but are used
@@ -79,7 +79,7 @@ dev = [
 # ignores certain interpreter version constraints.
 hooks = [
   "pre-commit-hooks~=6.0",
-  "pyproject-fmt~=2.30",
+  "pyproject-fmt~=2.31",
   "sync-with-uv~=0.6",
   "uv~=0.13",
 ]
