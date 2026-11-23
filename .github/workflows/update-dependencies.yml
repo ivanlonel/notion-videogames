@@ -7,13 +7,19 @@ on:
       - synchronize
 
 jobs:
+  # Runs the hooks, and with them code nobody has vetted: `uv lock --upgrade` ignores
+  # minimumReleaseAge and may build sdists, and the second prek pass installs the hook revs the
+  # first one just bumped. So this job holds no write credential at all (read-only token,
+  # nothing persisted); it only hands its diff to commit-hooks. A token on the same runner
+  # would not be safe in a later step either: a hook can plant .git/hooks or leave a process
+  # behind.
   post-renovate-hooks:
     # Only run on PRs opened by the Renovate GitHub App. Check the PR author from the event
     # payload rather than github.actor, which reflects whoever triggered the latest run
     # (e.g. a re-run or a pushed commit) and is spoofable.
     # Renovate's lock file maintenance is never a trigger: that branch is lockfile-only, so
-    # Renovate would rebuild it on every run once this job committed to it. The weekly group
-    # PR refreshes the whole lock in step 0 instead, and renovate.json disables
+    # Renovate would rebuild it on every run once this workflow committed to it. The weekly
+    # group PR refreshes the whole lock in step 0 instead, and renovate.json disables
     # lockFileMaintenance.
     if: github.event.pull_request.user.login == 'renovate[bot]' &&
       (contains(github.event.pull_request.labels.*.name, 'pep621') ||
@@ -21,16 +27,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
 
     steps:
-      - name: Checkout PR branch
+      - name: Checkout PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # Check out the actual PR branch so we can push changes back to it.
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.RENOVATE_TOKEN }}
+          # The commit this run is for; commit-hooks refuses to push if the branch moved since.
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
@@ -41,7 +48,7 @@ jobs:
       # ── Step 0: refresh the whole lock, on the weekly group PR only ───
       # Renovate writes uv.lock for each PR's own bumps; this stands in for its
       # lockFileMaintenance. Unlike that lockfile-only branch, this one carries a pyproject.toml
-      # bump Renovate leaves alone, so the refresh can sit in this job's commit, and step 1
+      # bump Renovate leaves alone, so the refresh can sit in this workflow's commit, and step 1
       # re-pins every sync-with-uv hook to it in the same commit. Each checker or engine update
       # then runs, and fails, on the PR that brings it. Major-update and security PRs stay
       # focused on their own bump.
@@ -100,7 +107,65 @@ jobs:
           prek-version: "v0.5.10"
           extra-args: --all-files --verbose --hook-stage manual pyproject-fmt
 
-      # ── Step 2: Commit any hook-generated changes back to the PR branch ───
+      # ── Step 2: hand the result to commit-hooks ───
+      - name: Save the hook results
+        id: diff
+        run: |
+          git diff --binary > "$RUNNER_TEMP/hooks.patch"
+          git diff --stat
+          if [ -s "$RUNNER_TEMP/hooks.patch" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Upload the hook results
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hooks-patch
+          path: ${{ runner.temp }}/hooks.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  # Pushes post-renovate-hooks' diff with RENOVATE_TOKEN (a push with this job's own token
+  # would not start CI). It runs no code from the branch: checkout, git apply, commit, push.
+  commit-hooks:
+    needs: post-renovate-hooks
+    if: needs.post-renovate-hooks.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+
+    steps:
+      # artipacked is ignored on the checkout below: this job intentionally persists the
+      # checkout credentials so git-auto-commit-action (last step) can push the hook results
+      # back to the Renovate PR branch. Nothing from the branch runs in this job to read them.
+      - name: Checkout PR branch # zizmor: ignore[artipacked]
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.RENOVATE_TOKEN }}
+
+      - name: Stop if the branch moved since the hooks ran
+        env:
+          HOOKED: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$HOOKED" ]; then
+            echo "::error::The branch moved past $HOOKED; the run for its new head applies the hooks."
+            exit 1
+          fi
+
+      - name: Download the hook results
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: hooks-patch
+          path: ${{ runner.temp }}/hooks
+
+      # Only the files the hooks are meant to touch: git apply skips every other path once an
+      # --include is given.
+      - name: Apply the hook results
+        run: |
+          git apply --include=.pre-commit-config.yaml --include=pyproject.toml --include=uv.lock \
+            --include=requirements.txt "$RUNNER_TEMP/hooks/hooks.patch"
+          git diff --stat
+
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # v7
         with:
